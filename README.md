@@ -59,6 +59,8 @@ No primeiro QR, a pessoa escolhe entre duas opções:
 
 **Recuperação sem email.** Ao criar a conta, a pessoa recebe um **código de recuperação** (ex.: `3373-6V8A-QGGE`), que aparece uma única vez. Em "Já tenho conta → Esqueci-me da palavra-passe", com a alcunha e o código, escolhe uma palavra-passe nova e recebe um código novo (o antigo deixa de valer). Com a sessão iniciada, também pode gerar um código novo em "Novo código de recuperação".
 
+**Alcunhas únicas.** Não há duas contas com a mesma alcunha (`contas.utilizador` é `UNIQUE` e guardado sempre em minúsculas, por isso `Noel` = `noel`). Se a alcunha já existir, a app sugere 3 nomes livres (ex.: `noel.uma`, `noel_22`, `noel81`) para a pessoa tocar e usar.
+
 Segurança:
 
 - Palavras-passe e códigos guardados com bcrypt (`pgcrypto`).

@@ -141,6 +141,9 @@ try {
   verificar('Com sessão, gera um código novo', novoCod.ok && /^[A-Z0-9-]{14}$/.test(novoCod.codigo_recuperacao));
   const dup = await rpc('criar_conta', { p_utilizador: nomes[0], p_password: 'outra-pass' });
   verificar('Nome de utilizador repetido é recusado', dup.ok === false && dup.erro === 'utilizador_existe', JSON.stringify(dup));
+  verificar('Nome repetido: sugere 3 nomes livres', Array.isArray(dup.sugestoes) && dup.sugestoes.length === 3, JSON.stringify(dup.sugestoes));
+  const maiusc = await rpc('criar_conta', { p_utilizador: nomes[0].toUpperCase(), p_password: 'outra-pass' });
+  verificar('Maiúsculas contam como o mesmo nome (único)', maiusc.ok === false && maiusc.erro === 'utilizador_existe');
   const mau = await rpc('criar_conta', { p_utilizador: 'Nome Com Espaços!', p_password: 'abcdef' });
   verificar('Nome de utilizador inválido é recusado', mau.ok === false && mau.erro === 'utilizador_invalido');
   const curta = await rpc('criar_conta', { p_utilizador: `t_${randomUUID().slice(0, 8)}`, p_password: '123' });

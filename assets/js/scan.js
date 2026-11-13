@@ -96,7 +96,7 @@ const ERROS_CONTA = {
 
 const limpaNome = (s) => String(s || '').replace(/[^a-z0-9._-]/gi, '');
 
-function mostrarConta(token, modo = 'criar', erro = '', nome = '') {
+function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = []) {
   const criar = modo === 'criar', recuperar = modo === 'recuperar';
   const titulo = recuperar ? 'Recuperar conta' : (token ? 'Quase lá!' : `Sobe<span style="color:var(--laranja)">+</span>`);
   const sub = recuperar
@@ -132,7 +132,10 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '') {
           <p class="pequeno" style="margin:6px 0 0">Não pedimos email, número de aluno, localização nem dados de saúde.
             Participar é voluntário e, se precisares do elevador, usa-o sem hesitar. <a href="../#etica">Saber mais</a></p>
         </div>` : ''}
-        ${erro ? `<p class="aviso-caixa" role="alert" style="margin:0">${erro}</p>` : ''}
+        ${erro ? `<div class="aviso-caixa" role="alert"><p style="margin:0">${erro}</p>
+          ${sugestoes.length ? `<p class="pequeno" style="margin:8px 0 6px">Nomes livres (toca para usar):</p>
+          <div class="chips">${sugestoes.map((s) => limpaNome(s)).map((s) => `<button type="button" class="chip" data-sugestao="${s}">${s}</button>`).join('')}</div>` : ''}
+        </div>` : ''}
         <button class="btn" type="submit">${criar ? 'Aceitar e criar conta' : recuperar ? 'Mudar palavra-passe e entrar' : 'Entrar'}</button>
         ${modo === 'entrar' ? '<p class="centro" style="margin:0"><button type="button" class="ligacao-btn" data-modo="recuperar">Esqueci-me da palavra-passe</button></p>' : ''}
         ${recuperar ? '<p class="centro" style="margin:0"><button type="button" class="ligacao-btn" data-modo="entrar">Voltar a entrar</button></p>' : ''}
@@ -149,6 +152,11 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '') {
 
   ecra.querySelectorAll('[data-modo]').forEach((b) => b.addEventListener('click', () => {
     mostrarConta(token, b.dataset.modo, '', document.getElementById('u').value);
+  }));
+  ecra.querySelectorAll('[data-sugestao]').forEach((b) => b.addEventListener('click', () => {
+    document.getElementById('u').value = b.dataset.sugestao;
+    ecra.querySelectorAll('[data-sugestao]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    document.getElementById('pw').focus();
   }));
   document.getElementById('sem-conta')?.addEventListener('click', () => {
     userId = lerTipo() === 'convidado' && lerId() ? lerId() : criarId();
@@ -171,7 +179,12 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '') {
       console.error(e);
       return mostrarConta(token, modo, 'Sem ligação ao servidor. Tenta outra vez.', u);
     }
-    if (!r.ok) return mostrarConta(token, modo, ERROS_CONTA[r.erro] ?? 'Algo correu mal. Tenta outra vez.', u);
+    if (!r.ok) {
+      const msg = r.erro === 'utilizador_existe' && criar
+        ? `A alcunha «${limpaNome(u)}» já é de outra pessoa. Cada alcunha é única: escolhe outra.`
+        : (ERROS_CONTA[r.erro] ?? 'Algo correu mal. Tenta outra vez.');
+      return mostrarConta(token, modo, msg, u, r.sugestoes || []);
+    }
     definirId(r.user_id, r.utilizador);
     userId = r.user_id;
     const seguir = () => (token ? registar(token) : mostrarEstado());
