@@ -37,6 +37,7 @@ function guardarDirecao(piso, dir) {
 
 function cartaz(p, dir) {
   const url = `${CONFIG.siteUrl}/s/?p=${encodeURIComponent(p.token)}`;
+  const fixo = (seg) => `cerca de ${ui.duracao(seg)}`.replace(/ /g, ' ');
   const escada = CONFIG.tempoEscadaPorAndarSeg, elev = CONFIG.esperaElevadorSeg;
   return `<div class="escala" data-piso="${p.piso}">
     <div class="direcoes" role="group" aria-label="Direção da seta para o Piso ${p.piso}">
@@ -56,7 +57,7 @@ function cartaz(p, dir) {
         <div class="escadas">${seta(DIRECOES[dir])}<span>Escadas</span></div>
       </div>
       <div class="info">
-        <p>Subir 1 andar a pé: <strong>cerca de ${ui.duracao(escada)}</strong>. Esperar pelo elevador: <strong>cerca de ${ui.duracao(elev)}</strong>.</p>
+        <p>Subir 1 andar a pé: <strong>${fixo(escada)}</strong>. Esperar pelo elevador: <strong>${fixo(elev)}</strong>.</p>
         <p>A OMS recomenda 150 minutos de atividade física moderada por semana.</p>
         <p style="font-size:4mm;color:#5C554F">Participação voluntária e anónima. Se precisas do elevador, usa-o sem hesitar.</p>
       </div>

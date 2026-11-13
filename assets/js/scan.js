@@ -255,8 +255,8 @@ function cartaoPessoal(pe) {
     <span class="etiqueta">O teu contador</span>
     <div class="numeros" style="margin-top:12px">
       <div><div class="valor num" data-contar="${pe.subidas}">0</div><div class="rotulo">${pe.subidas === 1 ? 'subida' : 'subidas'}</div></div>
-      <div><div class="valor num" data-contar="${pe.andares}">0</div><div class="rotulo">andares</div></div>
-      <div><div class="valor num" data-contar="${m}">0</div><div class="rotulo">metros</div></div>
+      <div><div class="valor num" data-contar="${pe.andares}">0</div><div class="rotulo">${pe.andares === 1 ? 'andar' : 'andares'}</div></div>
+      <div><div class="valor num" data-contar="${m}">0</div><div class="rotulo">${m === 1 ? 'metro' : 'metros'}</div></div>
     </div>
   </section>`;
 }

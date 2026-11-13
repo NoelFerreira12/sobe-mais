@@ -114,7 +114,7 @@ p { margin: 0 0 .8em; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
-  min-width: 52px; min-height: 48px; padding: 10px 16px; border-radius: 999px;
+  min-width: 48px; min-height: 48px; padding: 10px 13px; border-radius: 999px;
   border: 2px solid var(--borda); background: var(--superficie); color: var(--texto);
   font: 700 1.05rem var(--fonte); cursor: pointer;
 }
@@ -189,6 +189,7 @@ p { margin: 0 0 .8em; }
 /* Meta */
 .meta-linha { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .meta-linha .num { font-size: 2rem; }
+.meta-linha h2 { margin: 0; }
 .pontos { display: flex; gap: 6px; margin: 10px 0 4px; flex-wrap: wrap; }
 .pontos i { width: 26px; height: 26px; border-radius: 50%; background: var(--superficie-2); border: 2px solid var(--borda); }
 .pontos i.cheio { background: var(--laranja); border-color: var(--laranja); }
