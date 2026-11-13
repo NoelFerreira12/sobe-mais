@@ -35,8 +35,10 @@ function verificar(nome, cond, detalhe = '') {
 }
 
 /** Sequência de scans: [[piso, esperaAntesEmSeg], ...] — devolve as respostas. */
-async function sequencia(passos) {
-  const id = await novoId();
+const convidados = [];
+async function sequencia(passos, { semConta = false } = {}) {
+  const id = semConta ? randomUUID() : await novoId();
+  if (semConta) convidados.push(id);
   const out = [];
   for (const [piso, espera] of passos) {
     if (espera) await esperar(espera * 1000);
@@ -58,7 +60,7 @@ try {
 
   console.log('A correr cenários em paralelo (~3,5 min)…');
   const t0 = Date.now();
-  const [a, b, c, d, e, f, g, h, i, extra] = await Promise.all([
+  const [a, b, c, d, e, f, g, h, i, extra, conv] = await Promise.all([
     sequencia([[-3, 0], [-2, 15]]),
     sequencia([[-3, 0], [-2, 8]]),
     sequencia([[-3, 0], [0, 45]]),
@@ -70,6 +72,8 @@ try {
     novoId().then((id) => rpc('registar_scan', { p_user_id: id, p_token: 'piso-3' })),
     // IDs extra para garantir que há participantes A e B com subidas válidas
     Promise.all(Array.from({ length: 6 }, () => sequencia([[-1, 0], [0, 13]]))),
+    // Sem conta: a subida conta para o total coletivo, sem entrar no teste A/B
+    sequencia([[-3, 0], [-2, 15]], { semConta: true }),
   ]);
   console.log(`Cenários terminados em ${Math.round((Date.now() - t0) / 1000)} s\n`);
 
@@ -110,9 +114,31 @@ try {
   const mudou = JSON.parse(sql(`select count(distinct variante) as n from public.scans where user_id in (${lista}) group by user_id having count(distinct variante) > 1;`)).rows;
   verificar('A variante de cada ID nunca muda', mudou.length === 0);
 
-  // ---------- Contas / login ----------
-  const semConta = await rpc('registar_scan', { p_user_id: randomUUID(), p_token: tok[0] });
-  verificar('Scan sem conta é recusado', semConta.ok === false && semConta.erro === 'sem_conta', JSON.stringify(semConta));
+  // ---------- Sem conta ----------
+  const cv = conv.out[1];
+  verificar('Sem conta: subida válida', cv.resultado === 'valida' && cv.conta === false, cv.resultado);
+  verificar('Sem conta: não recebe números (nem coletivos nem pessoais)', cv.convidado === true && !cv.coletivo && !cv.pessoal);
+  const varConv = JSON.parse(sql(`select variante from public.participantes where user_id = ${lit(conv.id)};`)).rows[0]?.variante;
+  verificar('Sem conta: fica fora do teste A/B (variante G)', varConv === 'G', varConv);
+  const col = await rpc('progresso_coletivo');
+  verificar('Sem conta: a subida entra no total coletivo', (col.lancos?.['-3'] ?? 0) >= 1, JSON.stringify(col.lancos));
+
+  // ---------- Contas / login / recuperação ----------
+  const nomeRec = `t_${randomUUID().slice(0, 8)}`;
+  const contaRec = await rpc('criar_conta', { p_utilizador: nomeRec, p_password: 'antiga123' });
+  ids.push(contaRec.user_id); nomes.push(nomeRec);
+  verificar('Criar conta devolve código de recuperação', /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(contaRec.codigo_recuperacao || ''), contaRec.codigo_recuperacao);
+  const recMau = await rpc('recuperar_conta', { p_utilizador: nomeRec, p_codigo: 'AAAA-BBBB-CCCC', p_nova_password: 'nova1234' });
+  verificar('Recuperar com código errado é recusado', recMau.ok === false && recMau.erro === 'codigo_errado');
+  const codigoSolto = contaRec.codigo_recuperacao.toLowerCase().replace(/-/g, ' ');
+  const recOk = await rpc('recuperar_conta', { p_utilizador: nomeRec, p_codigo: codigoSolto, p_nova_password: 'nova1234' });
+  verificar('Recuperar com o código certo (minúsculas, sem hífens) funciona', recOk.ok && recOk.user_id === contaRec.user_id && recOk.codigo_recuperacao !== contaRec.codigo_recuperacao);
+  verificar('Depois de recuperar, entra com a palavra-passe nova', (await rpc('entrar', { p_utilizador: nomeRec, p_password: 'nova1234' })).ok === true);
+  verificar('Depois de recuperar, a palavra-passe antiga deixa de valer', (await rpc('entrar', { p_utilizador: nomeRec, p_password: 'antiga123' })).ok === false);
+  const recVelho = await rpc('recuperar_conta', { p_utilizador: nomeRec, p_codigo: contaRec.codigo_recuperacao, p_nova_password: 'outra123' });
+  verificar('O código de recuperação antigo deixa de valer', recVelho.ok === false);
+  const novoCod = await rpc('novo_codigo_recuperacao', { p_user_id: contaRec.user_id });
+  verificar('Com sessão, gera um código novo', novoCod.ok && /^[A-Z0-9-]{14}$/.test(novoCod.codigo_recuperacao));
   const dup = await rpc('criar_conta', { p_utilizador: nomes[0], p_password: 'outra-pass' });
   verificar('Nome de utilizador repetido é recusado', dup.ok === false && dup.erro === 'utilizador_existe', JSON.stringify(dup));
   const mau = await rpc('criar_conta', { p_utilizador: 'Nome Com Espaços!', p_password: 'abcdef' });
@@ -150,9 +176,13 @@ try {
     const nossos = p.participantes?.length ?? 0;
     const part = p.participantes?.filter((x) => x.subidas >= 1).length ?? 0;
     verificar('Painel abre com a password certa', p.ok === true);
-    verificar('Painel conta os IDs de teste', nossos >= ids.length - 1, `${nossos} IDs, ${part} participantes`);
+    const esperado = JSON.parse(sql(`select count(*)::int as n from public.participantes
+      where variante in ('A','B') and user_id in (${ids.map(lit).join(',')});`)).rows[0].n;
+    verificar('Painel conta todos os participantes de teste com conta', nossos === esperado, `${nossos} de ${esperado} IDs, ${part} com subida`);
     verificar('Painel não expõe UUIDs', !JSON.stringify(p).match(/[0-9a-f]{8}-[0-9a-f]{4}-/i));
     verificar('Painel tem série diária', Array.isArray(p.diario) && p.diario.length >= 1, JSON.stringify(p.diario));
+    verificar('Painel: quem não tem conta fica fora do A/B', p.participantes.every((x) => x.variante === 'A' || x.variante === 'B'));
+    verificar('Painel: quem não tem conta aparece à parte', (p.convidados?.subidas ?? 0) >= 1, JSON.stringify(p.convidados));
   }
 } finally {
   if (inicioOriginal) {
@@ -160,7 +190,9 @@ try {
     console.log(`(estudo_inicio reposto = ${inicioOriginal})`);
   }
   if (ids.length) {
-    sql(`delete from public.contas where user_id in (${ids.map(lit).join(',')});
+    const todos = [...ids, ...convidados].map(lit).join(',');
+    sql(`delete from public.participantes where user_id in (${todos});
+         delete from public.contas where user_id in (${ids.map(lit).join(',')});
          delete from public.login_tentativas where utilizador like 't\\_%' or utilizador = 'nome com espaços!';
          delete from public.painel_tentativas;`);
     const resto = JSON.parse(sql(`select count(*)::int as n from public.scans where user_id in (${ids.map(lit).join(',')});`)).rows[0].n;

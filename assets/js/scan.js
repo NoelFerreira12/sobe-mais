@@ -1,6 +1,6 @@
 import { CONFIG } from '../../config.js';
 import { rpc } from './api.js';
-import { lerId, definirId, esquecerId } from './id.js';
+import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js';
 import { resumo, metros, metrosSubida, progressoRota } from './calc.js';
 import * as ui from './ui.js';
 import { lerQR } from './leitor.js';
@@ -80,40 +80,52 @@ function mostrarErroCamara(codigo) {
 // Ecrãs
 // ---------------------------------------------------------------------
 // ---------------------------------------------------------------------
-// Conta: cada utilizador entra com nome de utilizador + palavra-passe (sem email).
-// O token lido (se houver) fica à espera e é registado logo a seguir ao login.
+// Conta (opcional): alcunha + palavra-passe, sem email. Recuperação com código.
+// Sem conta, a pessoa pode continuar: as subidas contam para o total da UMa.
+// O token lido (se houver) fica à espera e é registado logo a seguir.
 // ---------------------------------------------------------------------
 const ERROS_CONTA = {
   utilizador_invalido: 'O nome tem de ter 3 a 24 caracteres: letras minúsculas, números, ponto, hífen ou _.',
   password_curta: 'A palavra-passe tem de ter pelo menos 6 caracteres.',
   utilizador_existe: 'Esse nome já está a ser usado. Escolhe outro ou entra na tua conta.',
   credenciais: 'Nome ou palavra-passe incorretos.',
+  codigo_errado: 'Nome ou código de recuperação incorretos.',
   bloqueado: 'Demasiadas tentativas falhadas. Espera 15 minutos.',
   muitas_contas: 'Muitas contas criadas agora mesmo. Tenta daqui a pouco.',
 };
 
+const limpaNome = (s) => String(s || '').replace(/[^a-z0-9._-]/gi, '');
+
 function mostrarConta(token, modo = 'criar', erro = '', nome = '') {
-  const criar = modo === 'criar';
+  const criar = modo === 'criar', recuperar = modo === 'recuperar';
+  const titulo = recuperar ? 'Recuperar conta' : (token ? 'Quase lá!' : `Sobe<span style="color:var(--laranja)">+</span>`);
+  const sub = recuperar
+    ? 'Usa o código de recuperação que guardaste quando criaste a conta.'
+    : (token ? 'Entra ou cria uma conta. Também podes continuar sem conta.' : 'Entra ou cria uma conta para guardares o teu progresso.');
   ecra.innerHTML = `
     <div class="hero aparecer" style="padding-bottom:0"><div class="ilustracao" style="width:min(170px,50%)">${ui.MONTANHA}</div>
-      <h1>${token ? 'Quase lá!' : `Sobe<span style="color:var(--laranja)">+</span>`}</h1>
-      <p>${token ? 'Entra ou cria a tua conta para esta leitura contar.' : 'Entra ou cria a tua conta para participar.'}</p></div>
+      <h1>${titulo}</h1><p>${sub}</p></div>
     <section class="cartao aparecer aparecer-2">
-      <div class="separadores" role="tablist" aria-label="Conta">
+      ${recuperar ? '' : `<div class="separadores" role="tablist" aria-label="Conta">
         <button type="button" role="tab" data-modo="criar" aria-selected="${criar}">Criar conta</button>
         <button type="button" role="tab" data-modo="entrar" aria-selected="${!criar}">Já tenho conta</button>
-      </div>
+      </div>`}
       <form id="form-conta" class="pilha" novalidate>
         <div>
           <label for="u"><strong>Nome de utilizador</strong></label>
           <input type="text" id="u" name="username" autocomplete="username" autocapitalize="none" autocorrect="off"
-            spellcheck="false" minlength="3" maxlength="24" required value="${nome.replace(/[^a-z0-9._-]/gi, '')}">
+            spellcheck="false" minlength="3" maxlength="24" required value="${limpaNome(nome)}">
           ${criar ? '<p class="muted pequeno" style="margin:6px 0 0">Usa uma alcunha. Não uses o teu nome verdadeiro nem o número de aluno.</p>' : ''}
         </div>
+        ${recuperar ? `<div>
+          <label for="cod"><strong>Código de recuperação</strong></label>
+          <input type="text" id="cod" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false"
+            placeholder="XXXX-XXXX-XXXX" maxlength="20" required>
+        </div>` : ''}
         <div>
-          <label for="pw"><strong>Palavra-passe</strong></label>
-          <input type="password" id="pw" name="password" autocomplete="${criar ? 'new-password' : 'current-password'}" minlength="6" maxlength="72" required>
-          ${criar ? '<p class="muted pequeno" style="margin:6px 0 0">Mínimo 6 caracteres. Não pedimos email, por isso guarda-a bem.</p>' : ''}
+          <label for="pw"><strong>${recuperar ? 'Nova palavra-passe' : 'Palavra-passe'}</strong></label>
+          <input type="password" id="pw" name="password" autocomplete="${criar || recuperar ? 'new-password' : 'current-password'}" minlength="6" maxlength="72" required>
+          ${criar ? '<p class="muted pequeno" style="margin:6px 0 0">Mínimo 6 caracteres. A seguir damos-te um código para recuperares a conta se a esqueceres.</p>' : ''}
         </div>
         ${criar ? `<div class="aviso-caixa">
           <p style="margin:0"><strong>Registamos um ID anónimo e a hora a que lês os QR, só para contar subidas.</strong></p>
@@ -121,14 +133,27 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '') {
             Participar é voluntário e, se precisares do elevador, usa-o sem hesitar. <a href="../#etica">Saber mais</a></p>
         </div>` : ''}
         ${erro ? `<p class="aviso-caixa" role="alert" style="margin:0">${erro}</p>` : ''}
-        <button class="btn" type="submit">${criar ? 'Aceitar e criar conta' : 'Entrar'}</button>
+        <button class="btn" type="submit">${criar ? 'Aceitar e criar conta' : recuperar ? 'Mudar palavra-passe e entrar' : 'Entrar'}</button>
+        ${modo === 'entrar' ? '<p class="centro" style="margin:0"><button type="button" class="ligacao-btn" data-modo="recuperar">Esqueci-me da palavra-passe</button></p>' : ''}
+        ${recuperar ? '<p class="centro" style="margin:0"><button type="button" class="ligacao-btn" data-modo="entrar">Voltar a entrar</button></p>' : ''}
       </form>
     </section>
+    ${recuperar ? '' : `<section class="cartao aparecer aparecer-3" style="margin-top:14px">
+      <h2>Sem conta?</h2>
+      <p class="muted" style="margin:0 0 12px">Podes subir na mesma: as tuas subidas contam para o total da UMa.
+        Só não guardamos o teu progresso noutros telemóveis nem entras na comparação do estudo.</p>
+      <p class="pequeno" style="margin:0 0 12px"><strong>Registamos um ID anónimo e a hora a que lês os QR, só para contar subidas.</strong></p>
+      <button class="btn secundario" type="button" id="sem-conta">Continuar sem conta</button>
+    </section>`}
     ${token ? '' : `<p class="muted centro pequeno" style="margin-top:16px">${ui.fraseComparacao(CONFIG)}</p>`}`;
 
   ecra.querySelectorAll('[data-modo]').forEach((b) => b.addEventListener('click', () => {
     mostrarConta(token, b.dataset.modo, '', document.getElementById('u').value);
   }));
+  document.getElementById('sem-conta')?.addEventListener('click', () => {
+    userId = lerTipo() === 'convidado' && lerId() ? lerId() : criarId();
+    if (token) registar(token); else mostrarEstado();
+  });
   document.getElementById('form-conta').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const u = document.getElementById('u').value.trim().toLowerCase();
@@ -137,7 +162,11 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '') {
     btn.disabled = true;
     let r;
     try {
-      r = await rpc(criar ? 'criar_conta' : 'entrar', { p_utilizador: u, p_password: pw });
+      if (recuperar) {
+        r = await rpc('recuperar_conta', { p_utilizador: u, p_codigo: document.getElementById('cod').value, p_nova_password: pw });
+      } else {
+        r = await rpc(criar ? 'criar_conta' : 'entrar', { p_utilizador: u, p_password: pw });
+      }
     } catch (e) {
       console.error(e);
       return mostrarConta(token, modo, 'Sem ligação ao servidor. Tenta outra vez.', u);
@@ -145,8 +174,31 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '') {
     if (!r.ok) return mostrarConta(token, modo, ERROS_CONTA[r.erro] ?? 'Algo correu mal. Tenta outra vez.', u);
     definirId(r.user_id, r.utilizador);
     userId = r.user_id;
-    if (token) registar(token); else mostrarEstado();
+    const seguir = () => (token ? registar(token) : mostrarEstado());
+    if (r.codigo_recuperacao) mostrarCodigo(r.codigo_recuperacao, seguir, recuperar);
+    else seguir();
   });
+}
+
+/** Mostra o código de recuperação (só aparece uma vez). */
+function mostrarCodigo(codigo, seguir, novo = false) {
+  const cod = String(codigo).replace(/[^A-Z0-9-]/g, '');
+  ecra.innerHTML = `
+    <section class="cartao aparecer">
+      <h1>${novo ? 'Palavra-passe mudada' : 'Conta criada!'}</h1>
+      <p>Este é o teu ${novo ? '<strong>novo</strong> ' : ''}código de recuperação. Se te esqueceres da palavra-passe,
+        é com ele que voltas a entrar. Tira um print ou copia-o para as tuas notas.</p>
+      <div class="codigo-rec num" id="codigo" aria-label="Código de recuperação">${cod}</div>
+      <div class="pilha" style="margin-top:14px">
+        <button class="btn secundario" type="button" id="copiar">Copiar código</button>
+        <button class="btn" type="button" id="guardei">Já guardei, continuar</button>
+      </div>
+      <p class="muted pequeno" style="margin:12px 0 0">Não o mostramos outra vez. Com a sessão iniciada podes gerar um novo no ecrã do teu progresso.</p>
+    </section>`;
+  document.getElementById('copiar').addEventListener('click', async (ev) => {
+    try { await navigator.clipboard.writeText(cod); ev.target.textContent = 'Copiado ✓'; } catch { ev.target.textContent = 'Seleciona e copia o código acima'; }
+  });
+  document.getElementById('guardei').addEventListener('click', seguir);
 }
 
 function carregar(txt = 'A registar…') {
@@ -249,6 +301,13 @@ function mostrarResultado(r) {
     const estaSubida = metrosSubida(r.piso_origem, r.piso);
     if (r.coletivo) variante = cartaoColetivo(r.coletivo, estaSubida);
     else if (r.pessoal) variante = cartaoPessoal(r.pessoal, estaSubida);
+    else if (r.convidado) variante = `<section class="cartao destaque">
+      <span class="etiqueta">Sem conta</span>
+      <h2 style="margin:8px 0 6px">Esta subida conta para o total da UMa</h2>
+      <p class="muted" style="margin:0 0 12px">Cria uma conta para guardares o teu progresso, usares outro telemóvel e entrares no estudo.
+        As subidas que já fizeste continuam a contar para a UMa.</p>
+      <button class="btn secundario" type="button" data-conta>Criar conta ou entrar</button>
+    </section>`;
   }
   ecra.innerHTML = `
     <section class="cartao resultado ${t.cls} aparecer">
@@ -284,7 +343,8 @@ async function mostrarEstado() {
       <button class="btn" onclick="location.reload()">Tentar outra vez</button></section>`;
     return;
   }
-  if (!estadoAtual.conta) {
+  const convidado = !estadoAtual.conta;
+  if (convidado && lerTipo() !== 'convidado') {
     esquecerId(); userId = null;
     return mostrarConta(null, 'entrar', 'A tua sessão terminou. Entra outra vez.');
   }
@@ -295,18 +355,38 @@ async function mostrarEstado() {
   const aviso = emCurso
     ? `<h2>Estás a meio de uma subida</h2><p style="margin:0">Começaste no ${ui.nomePiso(u.piso)} há ${ui.duracao(u.segundos_desde)}. Sobe e lê o QR quando chegares.</p>`
     : `<h2>Pronto para subir?</h2><p style="margin:0">Lê o QR do piso onde estás para começar uma subida.</p>`;
-  const nome = String(estadoAtual.utilizador || '').replace(/[^a-z0-9._-]/g, '');
+  const nome = limpaNome(estadoAtual.utilizador);
   ecra.innerHTML = `
-    <p class="ola aparecer">Olá, <strong>${nome}</strong></p>
+    ${convidado ? '' : `<p class="ola aparecer">Olá, <strong>${nome}</strong></p>`}
     <section class="cartao destaque aparecer">${aviso}</section>
     <div class="aparecer" style="margin-top:14px">${botaoLer()}</div>
+    ${convidado ? cartaoSemConta() : ''}
     <div id="comum" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>
     <p class="muted centro pequeno" style="margin-top:18px">${ui.fraseComparacao(CONFIG)}</p>
-    <p class="centro" style="margin:8px 0 0"><button class="ligacao-btn" type="button" id="sair">Terminar sessão</button></p>`;
-  document.getElementById('sair').addEventListener('click', () => {
+    ${convidado ? '' : `<p class="centro" style="margin:8px 0 0">
+      <button class="ligacao-btn" type="button" id="novo-codigo">Novo código de recuperação</button> ·
+      <button class="ligacao-btn" type="button" id="sair">Terminar sessão</button></p>`}`;
+  document.getElementById('sair')?.addEventListener('click', () => {
     esquecerId(); userId = null; estadoAtual = null; mostrarConta(null, 'entrar');
   });
+  document.getElementById('novo-codigo')?.addEventListener('click', async () => {
+    if (!confirm('Gerar um código de recuperação novo? O antigo deixa de funcionar.')) return;
+    try {
+      const r = await rpc('novo_codigo_recuperacao', { p_user_id: userId });
+      if (r.ok) mostrarCodigo(r.codigo_recuperacao, () => mostrarEstado(), true);
+    } catch (e) { console.error(e); alert('Sem ligação ao servidor. Tenta outra vez.'); }
+  });
   desenharComum();
+}
+
+/** Convite para criar conta (só para quem está sem conta). */
+function cartaoSemConta() {
+  return `<section class="cartao aparecer aparecer-2" style="margin-top:14px">
+    <h2>Estás sem conta</h2>
+    <p class="muted" style="margin:0 0 12px">As tuas subidas contam para o total da UMa. Com uma conta guardas o teu
+      progresso, podes usá-lo noutro telemóvel e entras no estudo.</p>
+    <button class="btn secundario" type="button" data-conta>Criar conta ou entrar</button>
+  </section>`;
 }
 
 // ---------------------------------------------------------------------
@@ -391,6 +471,7 @@ function animar() {
 
 ecra.addEventListener('click', (ev) => {
   if (ev.target.closest('[data-ler]')) abrirLeitor();
+  if (ev.target.closest('[data-conta]')) mostrarConta(null, 'criar');
 });
 
 ecra.addEventListener('click', async (ev) => {

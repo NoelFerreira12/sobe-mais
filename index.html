@@ -24,7 +24,7 @@
       <div class="hero aparecer">
         <div class="ilustracao" id="ilustracao"></div>
         <h1>Sobe<span style="color:var(--laranja)">+</span></h1>
-        <p>Troca o elevador pela escada sempre que puderes.<br>Sem app para instalar: basta uma alcunha e uma palavra-passe.</p>
+        <p>Troca o elevador pela escada sempre que puderes.<br>Sem app para instalar. Com conta ou sem conta.</p>
       </div>
 
       <section class="cartao destaque aparecer aparecer-2">
@@ -40,7 +40,8 @@
       <section class="cartao">
         <h2>Como participar</h2>
         <ol class="passos">
-          <li><strong>Cria a tua conta</strong> com uma alcunha e uma palavra-passe (só da primeira vez).</li>
+          <li><strong>Cria a tua conta</strong> com uma alcunha e uma palavra-passe (só da primeira vez), ou continua sem conta:
+            as tuas subidas contam na mesma para o total da UMa.</li>
           <li><strong>Lê o QR do piso onde estás</strong> com a câmara do telemóvel ou com o botão "Ler QR do piso", antes de subir.</li>
           <li><strong>Sobe pela escada</strong>, ao teu ritmo.</li>
           <li><strong>Lê o QR do piso onde chegas.</strong> A subida conta e esse piso passa a ser o início da próxima.</li>
@@ -60,7 +61,8 @@
         <h2>Participação e privacidade</h2>
         <ul style="padding-left:1.2em;margin:0">
           <li><strong>Voluntária.</strong> Participas só se quiseres e podes parar a qualquer momento.</li>
-          <li><strong>Sem dados pessoais.</strong> A tua conta tem só uma alcunha e uma palavra-passe (guardada cifrada).
+          <li><strong>Sem dados pessoais.</strong> A conta é opcional e tem só uma alcunha e uma palavra-passe (guardada cifrada).
+            Se te esqueceres da palavra-passe, recuperas a conta com o código que te damos ao criá-la.
             Nos dados do estudo apareces como um ID anónimo, com a hora a que lês cada QR. Não pedimos email, número de aluno,
             localização nem dados de saúde. Usa uma alcunha que não te identifique.</li>
           <li><strong>Sem pressão.</strong> Se precisas do elevador, ou simplesmente hoje não te apetece, usa-o sem hesitar.
@@ -76,7 +78,7 @@
   <script type="module">
     import { CONFIG } from './config.js';
     import * as ui from './assets/js/ui.js';
-    import { lerId, lerNome, esquecerId } from './assets/js/id.js';
+    import { lerId, lerNome, lerTipo, esquecerId } from './assets/js/id.js';
 
     document.getElementById('topo').innerHTML = ui.cabecalho('');
     document.getElementById('ilustracao').innerHTML = ui.MONTANHA;
@@ -88,11 +90,15 @@
       const nome = lerNome().replace(/[^a-z0-9._-]/g, '');
       document.getElementById('regresso').innerHTML = `
         <a class="btn secundario" href="s/">Ver o meu progresso${nome ? ` (${nome})` : ''}</a>`;
+      const convidado = lerTipo() === 'convidado';
       const box = document.getElementById('esquecer');
-      box.innerHTML = `<button class="ligacao-btn" id="btn-esquecer">Terminar sessão neste telemóvel</button>
-        <p class="muted pequeno" style="margin:0">Podes voltar a entrar com a tua alcunha e palavra-passe, aqui ou noutro telemóvel.</p>`;
+      box.innerHTML = convidado
+        ? `<button class="ligacao-btn" id="btn-esquecer">Esquecer este telemóvel</button>
+          <p class="muted pequeno" style="margin:0">Apaga o ID anónimo deste dispositivo. As subidas já feitas continuam no total da UMa.</p>`
+        : `<button class="ligacao-btn" id="btn-esquecer">Terminar sessão neste telemóvel</button>
+          <p class="muted pequeno" style="margin:0">Podes voltar a entrar com a tua alcunha e palavra-passe, aqui ou noutro telemóvel.</p>`;
       document.getElementById('btn-esquecer').addEventListener('click', () => {
-        if (confirm('Terminar sessão neste telemóvel?')) { esquecerId(); location.reload(); }
+        if (confirm(convidado ? 'Esquecer o ID anónimo deste telemóvel?' : 'Terminar sessão neste telemóvel?')) { esquecerId(); location.reload(); }
       });
     } else {
       document.getElementById('regresso').innerHTML = `<a class="btn secundario" href="s/">Entrar ou criar conta</a>`;

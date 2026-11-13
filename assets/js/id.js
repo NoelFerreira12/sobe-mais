@@ -27,7 +27,12 @@ export function lerId() {
 export function definirId(id, nome = '') {
   if (!UUID_RE.test(id || '')) throw new Error('ID inválido');
   guardar(id);
-  try { localStorage.setItem('sobe_nome', nome); } catch { /* */ }
+  try { localStorage.setItem('sobe_nome', nome); localStorage.setItem('sobe_tipo', 'conta'); } catch { /* */ }
+}
+
+/** 'conta' (com login), 'convidado' (sem conta) ou '' (sem ID). */
+export function lerTipo() {
+  try { return localStorage.getItem('sobe_tipo') || ''; } catch { return ''; }
 }
 
 export function lerNome() {
@@ -44,10 +49,11 @@ export function criarId() {
     id = `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
   }
   guardar(id);
+  try { localStorage.setItem('sobe_tipo', 'convidado'); localStorage.removeItem('sobe_nome'); } catch { /* */ }
   return id;
 }
 
 export function esquecerId() {
-  try { ['sobe_medalhas', 'sobe_nome', CHAVE].forEach((k) => localStorage.removeItem(k)); } catch { /* */ }
+  try { ['sobe_medalhas', 'sobe_nome', 'sobe_tipo', CHAVE].forEach((k) => localStorage.removeItem(k)); } catch { /* */ }
   document.cookie = `${CHAVE}=; Max-Age=0; Path=${CAMINHO}`;
 }

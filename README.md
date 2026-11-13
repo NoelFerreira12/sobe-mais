@@ -50,22 +50,27 @@ As rotas e as altitudes estão em `config.js` (`rotaColetiva`, `rotaIndividual`)
 
 O servidor só envia os números coletivos às respostas da versão A. As páginas comuns (início, progresso, meta, sequência, medalhas) não mostram números coletivos a ninguém. O painel compara os dois grupos para ver qual consegue melhor resultado.
 
-### Contas (login)
+### Contas (login opcional)
 
-Cada utilizador tem de ter conta para participar: **nome de utilizador (alcunha) + palavra-passe**, sem email.
+No primeiro QR, a pessoa escolhe entre duas opções:
 
-- A conta é criada no primeiro QR (ou em `/s/`). Com a mesma alcunha e palavra-passe pode entrar-se noutro telemóvel e o progresso continua.
-- A palavra-passe é guardada com bcrypt (`pgcrypto`). Há bloqueio de 15 min após 10 tentativas falhadas por nome.
-- `registar_scan` recusa IDs sem conta. Cada pessoa conta como um só participante, mesmo que troque de telemóvel.
-- O painel e o CSV nunca mostram os nomes de utilizador, só pseudónimos (P001, …).
-- Não há recuperação de palavra-passe (não há email). Se alguém a esquecer, cria uma conta nova.
+- **Criar conta / entrar:** **nome de utilizador (alcunha) + palavra-passe**, sem email. Entra no teste A/B (sorteio 50/50) e pode continuar o progresso noutro telemóvel. Cada pessoa conta como um só participante.
+- **Continuar sem conta:** fica só com um ID anónimo no telemóvel (variante `G`). As subidas **contam para o total coletivo da UMa**, mas a pessoa não entra na comparação A/B. Depois de uma subida válida vê só "Esta subida conta para o total da UMa", sem números (nem coletivos nem pessoais), para não contaminar o teste se mais tarde criar conta e lhe calhar a versão B. Pode criar conta a qualquer momento.
+
+**Recuperação sem email.** Ao criar a conta, a pessoa recebe um **código de recuperação** (ex.: `3373-6V8A-QGGE`), que aparece uma única vez. Em "Já tenho conta → Esqueci-me da palavra-passe", com a alcunha e o código, escolhe uma palavra-passe nova e recebe um código novo (o antigo deixa de valer). Com a sessão iniciada, também pode gerar um código novo em "Novo código de recuperação".
+
+Segurança:
+
+- Palavras-passe e códigos guardados com bcrypt (`pgcrypto`).
+- Bloqueio de 15 min após 10 tentativas falhadas por nome (login e recuperação).
+- O painel e o CSV nunca mostram os nomes de utilizador, só pseudónimos (P001, …). Quem não tem conta aparece num cartão à parte e numa coluna própria no CSV diário.
 
 ### Base de dados
 
 Ficheiro: `supabase/migrations/20261113000000_schema.sql`.
 
 - Tabelas: `config`, `pisos`, `contas`, `login_tentativas`, `participantes`, `scans`, `painel_tentativas`. Têm RLS ativo e nenhuma política, e as permissões foram retiradas a `anon`/`authenticated`: a chave pública só consegue chamar as RPC.
-- RPC: `criar_conta`, `entrar`, `registar_scan`, `estado_utilizador`, `progresso_coletivo`, `definir_meta`, `painel` (password), `pisos_qr` (password).
+- RPC: `criar_conta`, `entrar`, `recuperar_conta`, `novo_codigo_recuperacao`, `registar_scan`, `estado_utilizador`, `progresso_coletivo`, `definir_meta`, `painel` (password), `pisos_qr` (password).
 - A base de dados guarda pisos/andares, não metros. Os metros calculam-se sempre com as alturas atuais do `config.js`.
 - Rate limit por ID: no mínimo 2 s entre scans e no máximo 60 scans por hora.
 - O workflow `.github/workflows/manter-ativo.yml` chama `progresso_coletivo()` uma vez por dia, para o plano Free não pausar o projeto.
@@ -154,6 +159,6 @@ Só seria preciso pagar para ter um domínio próprio (cerca de 10 €/ano, opci
 
 ## Ética
 
-- Participação voluntária. A conta tem só uma alcunha e uma palavra-passe (sem email). Nos dados do estudo, cada pessoa é um ID anónimo, com a hora dos scans.
+- Participação voluntária. A conta é opcional e tem só uma alcunha e uma palavra-passe (sem email). Nos dados do estudo, cada pessoa é um ID anónimo, com a hora dos scans.
 - Não há rankings individuais. As medalhas premeiam a regularidade, não a quantidade.
 - Nenhuma mensagem envergonha quem usa o elevador nem incentiva a subir à pressa. Quem precisa do elevador deve usá-lo.

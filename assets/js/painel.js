@@ -145,12 +145,17 @@ function mostrarPainel(d) {
         <div class="rotulo"><i style="background:var(--serie-b);width:10px;height:10px;border-radius:2px;display:inline-block"></i> Versão B · pessoal</div>
         <div class="valor num">${B.n}</div><div class="nota">${B.ids} IDs com pelo menos 1 leitura</div>
       </section>
+      <section class="cartao kpi">
+        <div class="rotulo">Sem conta (fora do teste A/B)</div>
+        <div class="valor num">${d.convidados?.com_subida ?? 0}</div>
+        <div class="nota">${d.convidados?.ids ?? 0} IDs · ${d.convidados?.subidas ?? 0} subidas válidas, que contam para o total coletivo · ${d.contas ?? 0} contas criadas</div>
+      </section>
     </div>
 
     <section class="cartao">
       <h2>Comparação A vs B</h2>
       <div class="tabela-scroll"><table>
-        <thead><tr><th>Métrica (participantes)</th><th class="n">A · coletivo</th><th class="n">B · pessoal</th></tr></thead>
+        <thead><tr><th>Métrica (participantes com conta)</th><th class="n">A · coletivo</th><th class="n">B · pessoal</th></tr></thead>
         <tbody>
           ${linha('Participantes', A.n, B.n)}
           ${linha('Subidas válidas por semana — média', f1(A.taxaMedia, 2), f1(B.taxaMedia, 2), `Subidas ÷ semanas desde o 1.º scan (mín. 1). Mann–Whitney A&gt;B: ${fp(mwTaxa)}`)}
@@ -180,8 +185,8 @@ function mostrarPainel(d) {
       <div class="grafico" id="grafico">${grafico(d.diario)}<div class="dica" id="dica"></div></div>
       <details style="margin-top:10px"><summary class="ligacao-btn" style="display:inline-block">Ver tabela</summary>
         <div class="tabela-scroll"><table>
-          <thead><tr><th>Dia</th><th class="n">A subidas</th><th class="n">A pessoas</th><th class="n">B subidas</th><th class="n">B pessoas</th></tr></thead>
-          <tbody>${d.diario.map((x) => `<tr><td>${dataPt(x.dia)}</td><td class="n">${x.A}</td><td class="n">${x.A_pessoas}</td><td class="n">${x.B}</td><td class="n">${x.B_pessoas}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Ainda sem dias de estudo.</td></tr>'}</tbody>
+          <thead><tr><th>Dia</th><th class="n">A subidas</th><th class="n">A pessoas</th><th class="n">B subidas</th><th class="n">B pessoas</th><th class="n">Sem conta</th></tr></thead>
+          <tbody>${d.diario.map((x) => `<tr><td>${dataPt(x.dia)}</td><td class="n">${x.A}</td><td class="n">${x.A_pessoas}</td><td class="n">${x.B}</td><td class="n">${x.B_pessoas}</td><td class="n">${x.G ?? 0}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Ainda sem dias de estudo.</td></tr>'}</tbody>
         </table></div>
       </details>
     </section>
@@ -296,8 +301,8 @@ function csvParticipantes(d) {
   return csv([cab, ...rows]);
 }
 function csvDiario(d) {
-  return csv([['dia', 'A_subidas', 'A_pessoas', 'B_subidas', 'B_pessoas'],
-    ...d.diario.map((x) => [x.dia, x.A, x.A_pessoas, x.B, x.B_pessoas])]);
+  return csv([['dia', 'A_subidas', 'A_pessoas', 'B_subidas', 'B_pessoas', 'sem_conta_subidas', 'sem_conta_pessoas'],
+    ...d.diario.map((x) => [x.dia, x.A, x.A_pessoas, x.B, x.B_pessoas, x.G ?? 0, x.G_pessoas ?? 0])]);
 }
 function descarregar(nome, texto) {
   const url = URL.createObjectURL(new Blob([texto], { type: 'text/csv;charset=utf-8' }));
