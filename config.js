@@ -68,7 +68,7 @@ export const CONFIG = {
   },
 
   // Estudo (datas inclusivas, hora da Madeira). Também em public.config.
-  estudo: { inicio: '2026-11-16', fim: '2026-12-08' },
+  estudo: { inicio: '2026-11-13', fim: '2026-12-08' },
   objetivoParticipantes: 60,
   minimoParticipantes: 30,
 };

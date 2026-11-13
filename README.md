@@ -111,7 +111,7 @@ supabase db query --remote --yes "update public.config set valor = '15' where ch
 | `min_seg_por_andar` | 12 |
 | `max_seg_por_andar` | 180 |
 | `cooldown_seg` | 300 |
-| `estudo_inicio` / `estudo_fim` | 2026-11-16 / 2026-12-08 (inclusive, hora da Madeira) |
+| `estudo_inicio` / `estudo_fim` | 2026-11-13 / 2026-12-08 (inclusive, hora da Madeira) |
 
 Os scans feitos fora destas datas continuam a ser aceites, mas ficam marcados como fora do estudo (`no_estudo = false`) e o painel não os conta.
 
