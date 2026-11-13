@@ -5,6 +5,8 @@ import * as ui from './ui.js';
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
 const CHAVE = 'sobe_painel';
+const CHAVE_TESTES = 'sobe_painel_testes';
+const comTestes = () => { try { return sessionStorage.getItem(CHAVE_TESTES) === '1'; } catch { return false; } };
 
 // ---------------------------------------------------------------------
 // Estatística
@@ -87,7 +89,7 @@ function mostrarLogin(erro = '') {
 async function entrar(pw) {
   ecra.innerHTML = '<div class="carregar"><div class="roda"></div><span>A carregar…</span></div>';
   let r;
-  try { r = await rpc('painel', { p_password: pw }); } catch (e) {
+  try { r = await rpc('painel', { p_password: pw, p_incluir_fora: comTestes() }); } catch (e) {
     console.error(e); return mostrarLogin('Sem ligação ao servidor. Tenta outra vez.');
   }
   if (!r.ok) {
@@ -129,6 +131,14 @@ function mostrarPainel(d) {
         <button class="btn pequeno secundario" id="sair">Sair</button>
       </div>
     </div>
+
+    <label class="cartao" style="display:flex;gap:12px;align-items:flex-start;padding:14px 18px;cursor:pointer;${d.inclui_fora ? 'border-color:var(--aviso);background:var(--aviso-suave)' : ''}">
+      <input type="checkbox" id="testes" ${d.inclui_fora ? 'checked' : ''} style="width:22px;height:22px;margin-top:2px;accent-color:var(--laranja)">
+      <span><strong>Incluir leituras de teste (fora do estudo)</strong>
+        <span class="nota" style="display:block">${d.inclui_fora
+          ? 'A mostrar também as leituras antes de ' + dataPt(e.inicio) + ' e depois de ' + dataPt(e.fim) + '. <strong>Não uses estes números na análise.</strong>'
+          : `Só contam as leituras de ${dataPt(e.inicio)} a ${dataPt(e.fim)}. Há ${d.scans_fora_estudo} ${d.scans_fora_estudo === 1 ? 'leitura' : 'leituras'} fora do estudo (ex.: testes antes do lançamento).`}</span></span>
+    </label>
 
     <div class="grelha">
       <section class="cartao kpi">
@@ -205,8 +215,13 @@ function mostrarPainel(d) {
 
   document.getElementById('atualizar').onclick = () => entrar(sessionStorage.getItem(CHAVE) || '');
   document.getElementById('sair').onclick = () => { sessionStorage.removeItem(CHAVE); mostrarLogin(); };
-  document.getElementById('csv-part').onclick = () => descarregar('sobe-participantes.csv', csvParticipantes(d));
-  document.getElementById('csv-dia').onclick = () => descarregar('sobe-diario.csv', csvDiario(d));
+  const suf = d.inclui_fora ? '-com-testes' : '';
+  document.getElementById('csv-part').onclick = () => descarregar(`sobe-participantes${suf}.csv`, csvParticipantes(d));
+  document.getElementById('csv-dia').onclick = () => descarregar(`sobe-diario${suf}.csv`, csvDiario(d));
+  document.getElementById('testes').onchange = (ev) => {
+    try { sessionStorage.setItem(CHAVE_TESTES, ev.target.checked ? '1' : '0'); } catch { /* */ }
+    entrar(sessionStorage.getItem(CHAVE) || '');
+  };
   ligarDicas(d.diario);
 }
 
