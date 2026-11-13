@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#FBF7F2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141110" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="Sobe+: troca o elevador pela escada na Universidade da Madeira. Sem app, sem conta.">
+  <title>Sobe+ · UMa</title>
+  <link rel="icon" href="assets/img/icone.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+  <div class="app">
+    <div id="topo"></div>
+    <main class="pilha">
+      <div class="hero aparecer">
+        <div class="ilustracao" id="ilustracao"></div>
+        <h1>Sobe<span style="color:var(--laranja)">+</span></h1>
+        <p>Troca o elevador pela escada sempre que puderes.<br>Sem app para instalar e sem conta.</p>
+      </div>
+
+      <section class="cartao destaque aparecer aparecer-2">
+        <p style="margin:0;font-weight:600" id="comparacao"></p>
+      </section>
+
+      <div id="regresso"></div>
+
+      <section class="cartao">
+        <h2>Como participar</h2>
+        <ol class="passos">
+          <li><strong>Lê o QR do piso onde estás</strong> com a câmara do telemóvel, antes de subir.</li>
+          <li><strong>Sobe pela escada</strong>, ao teu ritmo.</li>
+          <li><strong>Lê o QR do piso onde chegas.</strong> A subida conta e esse piso passa a ser o início da próxima.</li>
+        </ol>
+        <p class="muted pequeno" style="margin:0">Há um QR em cada piso, do -3 ao 3. Descer não conta.
+          Para a subida contar, cada andar tem de demorar pelo menos alguns segundos: não há pressa.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>O que ganhas</h2>
+        <p style="margin:0">Medalhas pela regularidade (não pela quantidade), uma meta semanal escolhida por ti
+          e uma sequência de semanas, com uma semana de pausa permitida.</p>
+      </section>
+
+      <section class="cartao" id="etica">
+        <h2>Participação e privacidade</h2>
+        <ul style="padding-left:1.2em;margin:0">
+          <li><strong>Voluntária.</strong> Participas só se quiseres e podes parar a qualquer momento.</li>
+          <li><strong>Sem dados pessoais.</strong> Guardamos apenas um ID anónimo aleatório (no teu telemóvel)
+            e a hora a que lês cada QR. Não pedimos nome, email, número de aluno, localização nem dados de saúde.</li>
+          <li><strong>Sem pressão.</strong> Se precisas do elevador, ou simplesmente hoje não te apetece, usa-o sem hesitar.
+            Não há rankings individuais.</li>
+          <li><strong>Estudo.</strong> Os dados agregados e anónimos são usados num trabalho de Persuasive Computing
+            da Universidade da Madeira, de 16 de novembro a 8 de dezembro.</li>
+        </ul>
+        <div id="esquecer" style="margin-top:10px"></div>
+      </section>
+    </main>
+    <footer class="rodape">Sobe+ · Persuasive Computing · Universidade da Madeira</footer>
+  </div>
+  <script type="module">
+    import { CONFIG } from './config.js';
+    import * as ui from './assets/js/ui.js';
+    import { lerId, esquecerId } from './assets/js/id.js';
+
+    document.getElementById('topo').innerHTML = ui.cabecalho('');
+    document.getElementById('ilustracao').innerHTML = ui.MONTANHA;
+    document.getElementById('comparacao').textContent = ui.fraseComparacao(CONFIG);
+
+    const id = lerId();
+    if (id) {
+      document.getElementById('regresso').innerHTML = `
+        <a class="btn" href="s/">Ver o meu progresso</a>`;
+      const box = document.getElementById('esquecer');
+      box.innerHTML = `<button class="ligacao-btn" id="btn-esquecer">Esquecer este telemóvel</button>
+        <p class="muted pequeno" style="margin:0">Apaga o ID anónimo deste dispositivo. Se voltares a ler um QR, começas de novo.</p>`;
+      document.getElementById('btn-esquecer').addEventListener('click', () => {
+        if (confirm('Apagar o ID anónimo deste telemóvel?')) { esquecerId(); location.reload(); }
+      });
+    }
+  </script>
+</body>
+</html>

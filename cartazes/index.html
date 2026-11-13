@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Sobe+ · Cartazes</title>
+  <link rel="icon" href="../assets/img/icone.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/app.css">
+  <style>
+    @page { size: A4 portrait; margin: 0; }
+    .controlo { max-width: 820px; margin: 0 auto; padding: 0 16px; }
+    .folhas { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0 48px; }
+    .cartaz {
+      /* Cores fixas: o cartaz é sempre impresso em fundo claro */
+      --c-laranja: #D84718; --c-texto: #323232; --c-creme: #FBF7F2;
+      width: 210mm; height: 297mm; background: #fff; color: var(--c-texto);
+      box-shadow: 0 10px 40px rgba(0,0,0,.18); position: relative; overflow: hidden;
+      display: flex; flex-direction: column; font-family: var(--fonte);
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .cartaz .faixa { background: var(--c-laranja); color: #fff; padding: 11mm 16mm 9mm; display: flex; align-items: center; justify-content: space-between; }
+    .cartaz .marca { display: flex; align-items: center; gap: 4mm; font-weight: 800; font-size: 17mm; letter-spacing: -.04em; line-height: 1; }
+    .cartaz .marca svg { width: 16mm; height: 16mm; }
+    .cartaz .uma { font-weight: 700; font-size: 5mm; text-align: right; line-height: 1.25; opacity: .95; }
+    .cartaz .corpo { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 8mm 16mm 0; text-align: center; }
+    .cartaz .piso { font-weight: 800; font-size: 40mm; line-height: .95; letter-spacing: -.05em; margin: 0; }
+    .cartaz .instrucao { font-weight: 800; font-size: 9.5mm; line-height: 1.12; margin: 5mm 0 6mm; color: var(--c-laranja); max-width: 170mm; }
+    .cartaz .qr { width: 88mm; height: 88mm; padding: 4mm; border: 1.2mm solid var(--c-texto); border-radius: 6mm; background: #fff; }
+    .cartaz .qr svg { width: 100%; height: 100%; }
+    .cartaz .aponta { font-size: 5mm; font-weight: 600; margin: 3mm 0 0; }
+    .cartaz .escadas { display: flex; align-items: center; justify-content: center; gap: 5mm; margin-top: 6mm; font-weight: 800; font-size: 9mm; }
+    .cartaz .seta { width: 22mm; height: 22mm; color: var(--c-laranja); }
+    .cartaz .info { background: var(--c-creme); margin: 6mm 16mm 0; border-radius: 6mm; padding: 6mm 8mm; text-align: left; font-size: 5.2mm; line-height: 1.35; }
+    .cartaz .info p { margin: 0; }
+    .cartaz .info p + p { margin-top: 2.5mm; }
+    .cartaz .info strong { color: var(--c-laranja); }
+    .cartaz .pe { display: flex; justify-content: space-between; align-items: flex-end; padding: 5mm 16mm 9mm; font-size: 3.6mm; color: #5C554F; }
+    .cartaz .codigo { font-family: ui-monospace, Consolas, monospace; font-size: 3.2mm; }
+    .direcoes { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .direcoes .chip { min-height: 40px; min-width: 44px; padding: 6px 12px; font-size: 1rem; }
+    .escala { transform-origin: top center; }
+    @media print {
+      body { background: #fff; }
+      .controlo, .barra-topo, .direcoes { display: none !important; }
+      .folhas { padding: 0; gap: 0; display: block; }
+      .escala { zoom: 1 !important; }
+      .cartaz { box-shadow: none; break-after: page; page-break-after: always; }
+      .cartaz:last-child { break-after: auto; page-break-after: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="controlo" id="controlo"></div>
+  <div class="folhas" id="folhas"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script type="module" src="../assets/js/cartazes.js"></script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Sobe+ · Painel do docente</title>
+  <link rel="icon" href="../assets/img/icone.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/app.css">
+  <style>
+    .app.largo { max-width: 980px; }
+    .grelha { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .kpi .valor { font-size: 2.4rem; line-height: 1.05; }
+    .kpi .rotulo { color: var(--texto-2); font-size: .9rem; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--borda); vertical-align: top; }
+    th { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--texto-2); }
+    td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .tabela-scroll { overflow-x: auto; }
+    .legenda { display: flex; gap: 18px; flex-wrap: wrap; font-size: .9rem; color: var(--texto-2); margin-bottom: 8px; }
+    .legenda span { display: inline-flex; align-items: center; gap: 6px; }
+    .legenda i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+    .grafico { position: relative; }
+    .grafico svg { width: 100%; height: auto; overflow: visible; }
+    .grafico .eixo { fill: var(--texto-2); font: 600 11px var(--fonte); }
+    .grafico .grade { stroke: var(--borda); stroke-width: 1; }
+    .grafico .alvo-hover { fill: transparent; }
+    .grafico .alvo-hover:hover, .grafico .alvo-hover.ativo { fill: var(--superficie-2); }
+    .dica {
+      position: absolute; pointer-events: none; background: var(--superficie); color: var(--texto);
+      border: 1px solid var(--borda); box-shadow: var(--sombra); border-radius: 12px; padding: 8px 12px;
+      font-size: .85rem; white-space: nowrap; transform: translate(-50%, -110%); display: none;
+    }
+    .dica i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+    .botoes { display: flex; gap: 10px; flex-wrap: wrap; }
+    .barra.alvo > span { transition-duration: .8s; }
+    .h1 { font-weight: 800; }
+    .nota { font-size: .85rem; color: var(--texto-2); }
+  </style>
+</head>
+<body>
+  <div class="app largo">
+    <div id="topo"></div>
+    <main id="ecra" class="pilha"></main>
+  </div>
+  <script type="module" src="../assets/js/painel.js"></script>
+</body>
+</html>

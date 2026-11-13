@@ -1,0 +1,21 @@
+name: Manter Supabase ativo
+
+# O plano Free do Supabase pausa projetos sem atividade durante 7 dias.
+# Este workflow chama progresso_coletivo() uma vez por dia.
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/manter-ativo.mjs

@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+*.local.*
+# QR codes contêm os tokens secretos dos pisos: gera-os localmente com `npm run qr`
+qrcodes/
+supabase/.temp/
+supabase/.branches/
+.DS_Store
+Thumbs.db
