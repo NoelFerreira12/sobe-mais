@@ -173,7 +173,10 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = [
       if (recuperar) {
         r = await rpc('recuperar_conta', { p_utilizador: u, p_codigo: document.getElementById('cod').value, p_nova_password: pw });
       } else {
-        r = await rpc(criar ? 'criar_conta' : 'entrar', { p_utilizador: u, p_password: pw });
+        r = criar
+          // Se este telemóvel já usou o Sobe+ sem conta, o servidor fica a saber (para a análise).
+          ? await rpc('criar_conta', { p_utilizador: u, p_password: pw, p_convidado: lerTipo() === 'convidado' ? lerId() : null })
+          : await rpc('entrar', { p_utilizador: u, p_password: pw });
       }
     } catch (e) {
       console.error(e);
@@ -319,13 +322,13 @@ function mostrarResultado(r) {
     // A ÚNICA diferença entre versões. O servidor só envia "coletivo" à versão A
     // e "pessoal" à versão B.
     const estaSubida = metrosSubida(r.piso_origem, r.piso);
+    // Sem conta (convidado) vê sempre o coletivo, como a versão A.
     if (r.coletivo) variante = cartaoColetivo(r.coletivo, estaSubida);
     else if (r.pessoal) variante = cartaoPessoal(r.pessoal, estaSubida);
-    else if (r.convidado) variante = `<section class="cartao destaque">
-      <span class="etiqueta">Sem conta</span>
-      <h2 style="margin:8px 0 6px">Esta subida conta para o total da UMa</h2>
-      <p class="muted" style="margin:0 0 12px">Cria uma conta para guardares o teu progresso, usares outro telemóvel e entrares no estudo.
-        As subidas que já fizeste continuam a contar para a UMa.</p>
+    if (r.convidado) variante += `<section class="cartao" style="margin-top:14px">
+      <h2 style="margin:0 0 6px">Estás sem conta</h2>
+      <p class="muted" style="margin:0 0 12px">A tua subida já conta para o total da UMa. Cria uma conta para guardares
+        o teu progresso, usares outro telemóvel e entrares no estudo.</p>
       <button class="btn secundario" type="button" data-conta>Criar conta ou entrar</button>
     </section>`;
   }

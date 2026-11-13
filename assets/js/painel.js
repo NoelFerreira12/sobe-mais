@@ -7,6 +7,8 @@ document.getElementById('topo').innerHTML = ui.cabecalho('../');
 const CHAVE = 'sobe_painel';
 const CHAVE_TESTES = 'sobe_painel_testes';
 const comTestes = () => { try { return sessionStorage.getItem(CHAVE_TESTES) === '1'; } catch { return false; } };
+const CHAVE_EX = 'sobe_painel_sem_ex';
+const excluirEx = () => { try { return sessionStorage.getItem(CHAVE_EX) === '1'; } catch { return false; } };
 
 // ---------------------------------------------------------------------
 // Estatística
@@ -108,7 +110,11 @@ let dados = null;
 
 function mostrarPainel(d) {
   dados = d;
-  const L = d.participantes;
+  const semEx = excluirEx();
+  const nEx = { A: 0, B: 0 };
+  d.participantes.forEach((l) => { if (l.ex_convidado && l.subidas >= 1 && nEx[l.variante] != null) nEx[l.variante]++; });
+  // Análise A/B: só contas (A e B). Sem conta (G) fica sempre de fora.
+  const L = d.participantes.filter((l) => (l.variante === 'A' || l.variante === 'B') && !(semEx && l.ex_convidado));
   const A = grupo(L, 'A'), B = grupo(L, 'B');
   const total = A.n + B.n;
   const obj = CONFIG.objetivoParticipantes, min = CONFIG.minimoParticipantes;
@@ -138,6 +144,12 @@ function mostrarPainel(d) {
         <span class="nota" style="display:block">${d.inclui_fora
           ? 'A mostrar também as leituras antes de ' + dataPt(e.inicio) + ' e depois de ' + dataPt(e.fim) + '. <strong>Não uses estes números na análise.</strong>'
           : `Só contam as leituras de ${dataPt(e.inicio)} a ${dataPt(e.fim)}. Há ${d.scans_fora_estudo} ${d.scans_fora_estudo === 1 ? 'leitura' : 'leituras'} fora do estudo (ex.: testes antes do lançamento).`}</span></span>
+    </label>
+    <label class="cartao" style="display:flex;gap:12px;align-items:flex-start;padding:14px 18px;cursor:pointer">
+      <input type="checkbox" id="sem-ex" ${semEx ? 'checked' : ''} style="width:22px;height:22px;margin-top:2px;accent-color:var(--laranja)">
+      <span><strong>Excluir da análise quem usou sem conta antes de criar conta</strong>
+        <span class="nota" style="display:block">Essas pessoas já tinham visto o progresso coletivo. Ex-convidados com subida:
+          A = ${nEx.A}, B = ${nEx.B}. Quem nunca criou conta fica sempre fora da análise A/B.</span></span>
     </label>
 
     <div class="grelha">
@@ -218,6 +230,10 @@ function mostrarPainel(d) {
   const suf = d.inclui_fora ? '-com-testes' : '';
   document.getElementById('csv-part').onclick = () => descarregar(`sobe-participantes${suf}.csv`, csvParticipantes(d));
   document.getElementById('csv-dia').onclick = () => descarregar(`sobe-diario${suf}.csv`, csvDiario(d));
+  document.getElementById('sem-ex').onchange = (ev) => {
+    try { sessionStorage.setItem(CHAVE_EX, ev.target.checked ? '1' : '0'); } catch { /* */ }
+    mostrarPainel(dados);
+  };
   document.getElementById('testes').onchange = (ev) => {
     try { sessionStorage.setItem(CHAVE_TESTES, ev.target.checked ? '1' : '0'); } catch { /* */ }
     entrar(sessionStorage.getItem(CHAVE) || '');
@@ -307,10 +323,10 @@ function csv(linhas) {
 }
 function csvParticipantes(d) {
   const n = d.estudo.semanas;
-  const cab = ['participante', 'variante', 'primeiro_dia', 'leituras', 'subidas_validas', 'andares',
+  const cab = ['participante', 'variante', 'tem_conta', 'ex_convidado', 'primeiro_dia', 'leituras', 'subidas_validas', 'andares',
     'dias_diferentes', 'subidas_7d', 'repetidas_7d', 'semanas_expostas', 'subidas_por_semana', 'meta_semanal',
     ...Array.from({ length: n }, (_, k) => `semana_${k + 1}`)];
-  const rows = d.participantes.map((l) => [l.id, l.variante, l.primeiro_dia, l.n_scans, l.subidas, l.andares,
+  const rows = d.participantes.map((l) => [l.id, l.variante, l.variante === 'G' ? 'nao' : 'sim', l.ex_convidado ? 'sim' : 'nao', l.primeiro_dia, l.n_scans, l.subidas, l.andares,
     l.dias, l.subidas_7d, Math.max(0, l.subidas_7d - 1), l.semanas_expostas,
     (l.subidas / Math.max(1, l.semanas_expostas)).toFixed(3), l.meta_semanal ?? '', ...l.por_semana]);
   return csv([cab, ...rows]);

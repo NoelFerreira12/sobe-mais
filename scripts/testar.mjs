@@ -117,11 +117,25 @@ try {
   // ---------- Sem conta ----------
   const cv = conv.out[1];
   verificar('Sem conta: subida válida', cv.resultado === 'valida' && cv.conta === false, cv.resultado);
-  verificar('Sem conta: não recebe números (nem coletivos nem pessoais)', cv.convidado === true && !cv.coletivo && !cv.pessoal);
+  verificar('Sem conta: vê o progresso coletivo (como a versão A)', cv.convidado === true && !!cv.coletivo && !cv.pessoal);
   const varConv = JSON.parse(sql(`select variante from public.participantes where user_id = ${lit(conv.id)};`)).rows[0]?.variante;
   verificar('Sem conta: fica fora do teste A/B (variante G)', varConv === 'G', varConv);
   const col = await rpc('progresso_coletivo');
   verificar('Sem conta: a subida entra no total coletivo', (col.lancos?.['-3'] ?? 0) >= 1, JSON.stringify(col.lancos));
+
+  // Quem usou sem conta e depois cria conta neste telemóvel fica marcado (já viu o coletivo)
+  const nomeEx = `t_${randomUUID().slice(0, 8)}`;
+  const contaEx = await rpc('criar_conta', { p_utilizador: nomeEx, p_password: PW_TESTE, p_convidado: conv.id });
+  ids.push(contaEx.user_id); nomes.push(nomeEx);
+  const marcas = JSON.parse(sql(`select utilizador, ex_convidado from public.contas where user_id in (${lit(contaEx.user_id)}, ${lit(ids[0])});`)).rows;
+  verificar('Conta criada depois de usar sem conta fica marcada (ex_convidado)',
+    marcas.find((m) => m.utilizador === nomeEx)?.ex_convidado === true && marcas.find((m) => m.utilizador !== nomeEx)?.ex_convidado === false);
+
+  // ---------- Equilíbrio A/B ----------
+  const contagem = JSON.parse(sql(`select variante, count(*)::int as n from public.participantes
+    where user_id in (${ids.map(lit).join(',')}) and variante in ('A','B') group by 1;`)).rows;
+  const nA = contagem.find((x) => x.variante === 'A')?.n ?? 0, nB = contagem.find((x) => x.variante === 'B')?.n ?? 0;
+  verificar('Contas de teste repartidas de forma equilibrada entre A e B', Math.abs(nA - nB) <= 2, `A=${nA}, B=${nB}`);
 
   // ---------- Contas / login / recuperação ----------
   const nomeRec = `t_${randomUUID().slice(0, 8)}`;
@@ -186,12 +200,12 @@ try {
     const nossos = p.participantes?.length ?? 0;
     const part = p.participantes?.filter((x) => x.subidas >= 1).length ?? 0;
     verificar('Painel abre com a password certa', p.ok === true);
-    const esperado = JSON.parse(sql(`select count(*)::int as n from public.participantes
-      where variante in ('A','B') and user_id in (${ids.map(lit).join(',')});`)).rows[0].n;
-    verificar('Painel conta todos os participantes de teste com conta', nossos === esperado, `${nossos} de ${esperado} IDs, ${part} com subida`);
+    const esperado = JSON.parse(sql(`select count(distinct user_id)::int as n from public.scans where no_estudo;`)).rows[0].n;
+    verificar('Painel tem uma linha por ID com leituras no estudo', nossos === esperado, `${nossos} de ${esperado} IDs, ${part} com subida`);
     verificar('Painel não expõe UUIDs', !JSON.stringify(p).match(/[0-9a-f]{8}-[0-9a-f]{4}-/i));
     verificar('Painel tem série diária', Array.isArray(p.diario) && p.diario.length >= 1, JSON.stringify(p.diario));
-    verificar('Painel: quem não tem conta fica fora do A/B', p.participantes.every((x) => x.variante === 'A' || x.variante === 'B'));
+    verificar('Painel: linhas sem conta vêm marcadas como G (o cliente tira-as da análise A/B)',
+      p.participantes.some((x) => x.variante === 'G') && p.participantes.every((x) => ['A', 'B', 'G'].includes(x.variante)));
     verificar('Painel: quem não tem conta aparece à parte', (p.convidados?.subidas ?? 0) >= 1, JSON.stringify(p.convidados));
   }
 } finally {
