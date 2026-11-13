@@ -41,6 +41,13 @@ export function cabecalho(raiz = '') {
   </header>`;
 }
 
+export function rodape(raiz = '') {
+  return `<nav class="rodape" aria-label="Ligações">
+    <a href="${raiz}./">Sobre</a> · <a href="${raiz}privacidade/">Privacidade</a> · <a href="${raiz}termos/">Termos</a>
+    <div style="margin-top:6px">Sobe+ · Persuasive Computing · Universidade da Madeira</div>
+  </nav>`;
+}
+
 export const fmt = (n, casas = 0) =>
   Number(n).toLocaleString('pt-PT', { maximumFractionDigits: casas, minimumFractionDigits: 0 });
 
@@ -54,9 +61,10 @@ export function fraseComparacao(CONFIG, andares = 2) {
 }
 
 export function duracao(seg) {
-  if (seg < 60) return `${Math.round(seg)} s`;
+  // espaços não separáveis: "30 s" nunca parte a meio da linha
+  if (seg < 60) return `${Math.round(seg)} s`;
   const m = Math.floor(seg / 60), s = Math.round(seg % 60);
-  return s ? `${m} min ${s} s` : `${m} min`;
+  return s ? `${m} min ${s} s` : `${m} min`;
 }
 
 export function vibrar(padrao = [30, 50, 30]) {
@@ -110,44 +118,39 @@ export function confettis() {
 }
 
 // ---------- Cartões comuns às duas variantes ----------
-export function cartaoMeta(r) {
+/** Meta semanal (compromisso) + sequência de semanas, num só cartão. */
+export function cartaoSemana(r) {
   const opcoes = [1, 2, 3, 4, 5];
+  const chips = (marcar) => opcoes.map((n) =>
+    `<button class="chip" data-meta="${n}" aria-pressed="${n === marcar}">${n}×</button>`).join('');
+  let meta;
   if (!r.meta) {
-    return `<section class="cartao" id="meta">
-      <h2>A tua meta semanal</h2>
-      <p class="muted">Opcional. Quantas vezes por semana te comprometes a subir pela escada?</p>
-      <div class="chips" role="group" aria-label="Meta semanal">
-        ${opcoes.map((n) => `<button class="chip" data-meta="${n}" aria-pressed="false">${n}×</button>`).join('')}
-      </div>
-    </section>`;
+    meta = `<p class="muted" style="margin:0 0 10px">Meta opcional: quantas vezes por semana te comprometes a subir?</p>
+      <div class="chips" role="group" aria-label="Meta semanal">${chips(null)}</div>`;
+  } else {
+    const feitos = Math.min(r.estaSemana, r.meta);
+    const pontos = Array.from({ length: r.meta }, (_, i) => `<i class="${i < feitos ? 'cheio' : ''}"></i>`).join('');
+    const msg = r.estaSemana >= r.meta ? 'Meta cumprida. Palavra dada!' : `Faltam ${r.meta - r.estaSemana}. Ao teu ritmo.`;
+    meta = `<div class="semana-linha"><span>Meta: <strong>${r.meta}× por semana</strong></span>
+        <span class="num" style="font-size:1.6rem">${r.estaSemana}/${r.meta}</span></div>
+      <div class="pontos" aria-hidden="true">${pontos}</div>
+      <p class="muted pequeno" style="margin:4px 0 0">${msg}</p>
+      <details style="margin-top:4px"><summary class="ligacao-btn" style="padding:4px 0;min-height:0">Mudar a meta</summary>
+        <div class="chips" role="group" aria-label="Meta semanal" style="margin-top:8px">${chips(r.meta)}
+          <button class="chip" data-meta="0" aria-pressed="false">Sem meta</button></div>
+      </details>`;
   }
-  const feitos = Math.min(r.estaSemana, r.meta);
-  const pontos = Array.from({ length: r.meta }, (_, i) => `<i class="${i < feitos ? 'cheio' : ''}"></i>`).join('');
-  const msg = r.estaSemana >= r.meta
-    ? 'Meta desta semana cumprida. Palavra dada!'
-    : `Faltam ${r.meta - r.estaSemana} esta semana. Ao teu ritmo.`;
+  let seqTxt;
+  if (r.sequencia === 0) seqTxt = 'Sobe em semanas seguidas para começar. Podes falhar 1 semana sem perder.';
+  else if (r.emPausa) seqTxt = 'Semana de pausa: não faz mal. Sobe esta semana para manter.';
+  else seqTxt = 'Podes falhar 1 semana sem perder a sequência.';
   return `<section class="cartao" id="meta">
-    <div class="meta-linha"><h2>A tua meta semanal</h2><span class="num">${r.estaSemana}/${r.meta}</span></div>
-    <div class="pontos" aria-hidden="true">${pontos}</div>
-    <p class="muted" style="margin:6px 0 0">Comprometeste-te a subir ${r.meta}× por semana. ${msg}</p>
-    <details style="margin-top:8px"><summary class="ligacao-btn" style="display:inline-block">Mudar a meta</summary>
-      <div class="chips" role="group" aria-label="Meta semanal" style="margin-top:8px">
-        ${opcoes.map((n) => `<button class="chip" data-meta="${n}" aria-pressed="${n === r.meta}">${n}×</button>`).join('')}
-        <button class="chip" data-meta="0" aria-pressed="false">Sem meta</button>
-      </div>
-    </details>
-  </section>`;
-}
-
-export function cartaoSequencia(r) {
-  let txt;
-  if (r.sequencia === 0) txt = 'Sobe em semanas seguidas para começar uma sequência. Podes falhar 1 semana sem a perder.';
-  else if (r.emPausa) txt = 'Semana de pausa: não faz mal. Sobe esta semana para manter a sequência.';
-  else txt = 'Podes falhar 1 semana sem perder a sequência.';
-  return `<section class="cartao">
-    <div class="meta-linha"><h2>Sequência</h2>
-      <span class="num" style="color:var(--laranja-texto)">${r.sequencia} ${r.sequencia === 1 ? 'semana' : 'semanas'}</span></div>
-    <p class="muted" style="margin:0">${txt}</p>
+    <h2>Esta semana</h2>
+    ${meta}
+    <div class="divisor"></div>
+    <div class="semana-linha"><span>Sequência</span>
+      <span class="num" style="font-size:1.4rem;color:var(--laranja-texto)">${r.sequencia} ${r.sequencia === 1 ? 'semana' : 'semanas'}</span></div>
+    <p class="muted pequeno" style="margin:2px 0 0">${seqTxt}</p>
   </section>`;
 }
 

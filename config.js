@@ -71,4 +71,9 @@ export const CONFIG = {
   estudo: { inicio: '2026-11-13', fim: '2026-12-08' },
   objetivoParticipantes: 60,
   minimoParticipantes: 30,
+
+  // Privacidade e termos (aparecem em /privacidade/ e /termos/).
+  // Preenche com o email do grupo ou do docente responsável pelo projeto.
+  contacto: '',
+  dadosApagadosAte: '2027-01-31', // os dados individuais são apagados até esta data
 };

@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#FBF7F2" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#141110" media="(prefers-color-scheme: dark)">
-  <meta name="description" content="Sobe+: troca o elevador pela escada na Universidade da Madeira. Sem app, sem conta.">
+  <meta name="description" content="Sobe+: troca o elevador pela escada na Universidade da Madeira. Sem app para instalar.">
   <title>Sobe+ · UMa</title>
   <link rel="icon" href="assets/img/icone.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Sobe+">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,84 +24,52 @@
       <div class="hero aparecer">
         <div class="ilustracao" id="ilustracao"></div>
         <h1>Sobe<span style="color:var(--laranja)">+</span></h1>
-        <p>Troca o elevador pela escada sempre que puderes.<br>Sem app para instalar. Com conta ou sem conta.</p>
+        <p>Troca o elevador pela escada sempre que puderes.</p>
+        <p class="hero-comparacao" id="comparacao"></p>
       </div>
 
-      <section class="cartao destaque aparecer aparecer-2">
-        <p style="margin:0;font-weight:600" id="comparacao"></p>
-      </section>
-
-      <div class="pilha">
+      <div class="pilha aparecer aparecer-2">
         <a class="btn" href="s/?ler=1" id="btn-ler"></a>
-        <div id="regresso"></div>
+        <a class="btn secundario" href="s/" id="btn-conta">Entrar ou criar conta</a>
       </div>
-      <p class="muted pequeno centro" style="margin-top:8px">Também podes usar a app da câmara do telemóvel: conta da mesma forma.</p>
 
-      <section class="cartao">
-        <h2>Como participar</h2>
+      <section class="cartao aparecer aparecer-3">
+        <h2>Como funciona</h2>
         <ol class="passos">
-          <li><strong>Cria a tua conta</strong> com uma alcunha e uma palavra-passe (só da primeira vez), ou continua sem conta:
-            as tuas subidas contam na mesma para o total da UMa.</li>
-          <li><strong>Lê o QR do piso onde estás</strong> com a câmara do telemóvel ou com o botão "Ler QR do piso", antes de subir.</li>
+          <li><strong>Lê o QR do piso onde estás</strong>, com o botão acima ou com a câmara do telemóvel.</li>
           <li><strong>Sobe pela escada</strong>, ao teu ritmo.</li>
-          <li><strong>Lê o QR do piso onde chegas.</strong> A subida conta e esse piso passa a ser o início da próxima.</li>
+          <li><strong>Lê o QR do piso onde chegas.</strong> A subida conta e ganhas metas numa rota pela Madeira.</li>
         </ol>
         <p class="muted pequeno" style="margin:0">Há um QR em cada piso, do -3 ao 3. Descer não conta.
-          Para a subida contar, cada andar tem de demorar pelo menos alguns segundos: não há pressa.</p>
+          Com conta guardas o teu progresso, mas também podes participar sem conta.</p>
       </section>
 
-      <section class="cartao">
-        <h2>O que ganhas</h2>
-        <p style="margin:0">Uma rota pela Madeira, com metas como a Fortaleza do Pico, o Pico dos Barcelos ou o Cabo Girão.
-          E ainda medalhas pela regularidade (não pela quantidade), uma meta semanal escolhida por ti
-          e uma sequência de semanas, com uma semana de pausa permitida.</p>
-      </section>
-
-      <section class="cartao" id="etica">
-        <h2>Participação e privacidade</h2>
-        <ul style="padding-left:1.2em;margin:0">
-          <li><strong>Voluntária.</strong> Participas só se quiseres e podes parar a qualquer momento.</li>
-          <li><strong>Sem dados pessoais.</strong> A conta é opcional e tem só uma alcunha e uma palavra-passe (guardada cifrada).
-            Se te esqueceres da palavra-passe, recuperas a conta com o código que te damos ao criá-la.
-            Nos dados do estudo apareces como um ID anónimo, com a hora a que lês cada QR. Não pedimos email, número de aluno,
-            localização nem dados de saúde. Usa uma alcunha que não te identifique.</li>
-          <li><strong>Sem pressão.</strong> Se precisas do elevador, ou simplesmente hoje não te apetece, usa-o sem hesitar.
-            Não há rankings individuais.</li>
-          <li><strong>Estudo.</strong> Os dados agregados e anónimos são usados num trabalho de Persuasive Computing
-            da Universidade da Madeira, de 13 de novembro a 8 de dezembro.</li>
+      <section class="cartao aparecer aparecer-3" id="etica">
+        <h2>Sem pressão, sem dados pessoais</h2>
+        <ul class="lista-simples">
+          <li>Participar é voluntário e podes parar quando quiseres.</li>
+          <li>Não pedimos nome, email, número de aluno, localização nem dados de saúde.</li>
+          <li>Se precisas do elevador, usa-o sem hesitar. Não há rankings individuais.</li>
         </ul>
-        <div id="esquecer" style="margin-top:10px"></div>
+        <p class="muted pequeno" style="margin:10px 0 0">Estudo de Persuasive Computing da UMa, de 13 de novembro a 8 de dezembro.</p>
       </section>
     </main>
-    <footer class="rodape">Sobe+ · Persuasive Computing · Universidade da Madeira</footer>
+    <div id="rodape"></div>
   </div>
   <script type="module">
     import { CONFIG } from './config.js';
     import * as ui from './assets/js/ui.js';
-    import { lerId, lerNome, lerTipo, esquecerId } from './assets/js/id.js';
+    import { lerId, lerNome } from './assets/js/id.js';
 
     document.getElementById('topo').innerHTML = ui.cabecalho('');
+    document.getElementById('rodape').innerHTML = ui.rodape('');
     document.getElementById('ilustracao').innerHTML = ui.MONTANHA;
     document.getElementById('comparacao').textContent = ui.fraseComparacao(CONFIG);
     document.getElementById('btn-ler').innerHTML = `${ui.ICONES.qr}<span>Ler QR do piso</span>`;
 
-    const id = lerId();
-    if (id) {
+    if (lerId()) {
       const nome = lerNome().replace(/[^a-z0-9._-]/g, '');
-      document.getElementById('regresso').innerHTML = `
-        <a class="btn secundario" href="s/">Ver o meu progresso${nome ? ` (${nome})` : ''}</a>`;
-      const convidado = lerTipo() === 'convidado';
-      const box = document.getElementById('esquecer');
-      box.innerHTML = convidado
-        ? `<button class="ligacao-btn" id="btn-esquecer">Esquecer este telemóvel</button>
-          <p class="muted pequeno" style="margin:0">Apaga o ID anónimo deste dispositivo. As subidas já feitas continuam no total da UMa.</p>`
-        : `<button class="ligacao-btn" id="btn-esquecer">Terminar sessão neste telemóvel</button>
-          <p class="muted pequeno" style="margin:0">Podes voltar a entrar com a tua alcunha e palavra-passe, aqui ou noutro telemóvel.</p>`;
-      document.getElementById('btn-esquecer').addEventListener('click', () => {
-        if (confirm(convidado ? 'Esquecer o ID anónimo deste telemóvel?' : 'Terminar sessão neste telemóvel?')) { esquecerId(); location.reload(); }
-      });
-    } else {
-      document.getElementById('regresso').innerHTML = `<a class="btn secundario" href="s/">Entrar ou criar conta</a>`;
+      document.getElementById('btn-conta').textContent = `Ver o meu progresso${nome ? ` (${nome})` : ''}`;
     }
   </script>
 </body>

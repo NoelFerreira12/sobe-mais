@@ -10,6 +10,7 @@ const botaoLer = (txt = 'Ler QR do piso', cls = '') =>
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
+document.getElementById('rodape').innerHTML = ui.rodape('../');
 
 const PEND = 'sobe_pendente';
 let estadoAtual = null;
@@ -129,8 +130,8 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = [
         </div>
         ${criar ? `<div class="aviso-caixa">
           <p style="margin:0"><strong>Registamos um ID anónimo e a hora a que lês os QR, só para contar subidas.</strong></p>
-          <p class="pequeno" style="margin:6px 0 0">Não pedimos email, número de aluno, localização nem dados de saúde.
-            Participar é voluntário e, se precisares do elevador, usa-o sem hesitar. <a href="../#etica">Saber mais</a></p>
+          <p class="pequeno" style="margin:6px 0 0">Sem email nem dados pessoais. Participar é voluntário e podes apagar tudo quando quiseres.
+            Ao continuar aceitas os <a href="../termos/">Termos</a> e a <a href="../privacidade/">Privacidade</a>.</p>
         </div>` : ''}
         ${erro ? `<div class="aviso-caixa" role="alert"><p style="margin:0">${erro}</p>
           ${sugestoes.length ? `<p class="pequeno" style="margin:8px 0 6px">Nomes livres (toca para usar):</p>
@@ -143,12 +144,11 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = [
     </section>
     ${recuperar ? '' : `<section class="cartao aparecer aparecer-3" style="margin-top:14px">
       <h2>Sem conta?</h2>
-      <p class="muted" style="margin:0 0 12px">Podes subir na mesma: as tuas subidas contam para o total da UMa.
-        Só não guardamos o teu progresso noutros telemóveis nem entras na comparação do estudo.</p>
-      <p class="pequeno" style="margin:0 0 12px"><strong>Registamos um ID anónimo e a hora a que lês os QR, só para contar subidas.</strong></p>
+      <p class="muted" style="margin:0 0 8px">Sobe na mesma: as tuas subidas contam para o total da UMa.</p>
+      <p class="pequeno" style="margin:0 0 12px"><strong>Registamos um ID anónimo e a hora a que lês os QR, só para contar subidas.</strong>
+        <a href="../privacidade/">Privacidade</a></p>
       <button class="btn secundario" type="button" id="sem-conta">Continuar sem conta</button>
-    </section>`}
-    ${token ? '' : `<p class="muted centro pequeno" style="margin-top:16px">${ui.fraseComparacao(CONFIG)}</p>`}`;
+    </section>`}`;
 
   ecra.querySelectorAll('[data-modo]').forEach((b) => b.addEventListener('click', () => {
     mostrarConta(token, b.dataset.modo, '', document.getElementById('u').value);
@@ -386,9 +386,16 @@ async function mostrarEstado() {
     ${convidado ? cartaoSemConta() : ''}
     <div id="comum" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>
     <p class="muted centro pequeno" style="margin-top:18px">${ui.fraseComparacao(CONFIG)}</p>
-    ${convidado ? '' : `<p class="centro" style="margin:8px 0 0">
-      <button class="ligacao-btn" type="button" id="novo-codigo">Novo código de recuperação</button> ·
-      <button class="ligacao-btn" type="button" id="sair">Terminar sessão</button></p>`}`;
+    <details class="cartao mais-metas" style="margin-top:14px;padding:14px 20px">
+      <summary><span>${convidado ? 'Os meus dados' : 'A minha conta'}</span></summary>
+      <div class="pilha" style="margin-top:12px">
+        ${convidado ? '' : `<button class="btn secundario pequeno" type="button" id="novo-codigo">Novo código de recuperação</button>
+        <button class="btn secundario pequeno" type="button" id="sair">Terminar sessão</button>`}
+        <button class="btn secundario pequeno" type="button" id="apagar" style="color:#B3261E">${convidado ? 'Apagar os meus dados' : 'Apagar a minha conta e dados'}</button>
+        <p class="muted pequeno" style="margin:0"><a href="../privacidade/">Privacidade</a> · <a href="../termos/">Termos</a></p>
+      </div>
+    </details>`;
+  document.getElementById('apagar').addEventListener('click', () => mostrarApagar(convidado));
   document.getElementById('sair')?.addEventListener('click', () => {
     esquecerId(); userId = null; estadoAtual = null; mostrarConta(null, 'entrar');
   });
@@ -400,6 +407,40 @@ async function mostrarEstado() {
     } catch (e) { console.error(e); alert('Sem ligação ao servidor. Tenta outra vez.'); }
   });
   desenharComum();
+}
+
+/** Direito ao apagamento: apaga conta, participante e todas as leituras. */
+function mostrarApagar(convidado, erro = '') {
+  ecra.innerHTML = `
+    <section class="cartao aparecer">
+      <h1>${convidado ? 'Apagar os meus dados' : 'Apagar a conta e os dados'}</h1>
+      <p>Vamos apagar ${convidado ? 'o teu ID anónimo' : 'a tua conta'} e <strong>todas as tuas leituras</strong>.
+        As tuas subidas deixam também de contar para o total da UMa. <strong>Não dá para desfazer.</strong></p>
+      <form id="form-apagar" class="pilha" novalidate>
+        ${convidado ? '' : `<div><label for="pw-apagar"><strong>Confirma com a tua palavra-passe</strong></label>
+          <input type="password" id="pw-apagar" autocomplete="current-password" required></div>`}
+        ${erro ? `<p class="aviso-caixa" role="alert" style="margin:0">${erro}</p>` : ''}
+        <button class="btn" type="submit" style="background:#B3261E">Apagar definitivamente</button>
+        <button class="btn secundario" type="button" id="cancelar">Cancelar</button>
+      </form>
+    </section>`;
+  document.getElementById('cancelar').addEventListener('click', () => mostrarEstado());
+  document.getElementById('form-apagar').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const pw = convidado ? null : document.getElementById('pw-apagar').value;
+    let r;
+    try { r = await rpc('apagar_dados', { p_user_id: userId, p_password: pw }); } catch (e) {
+      console.error(e); return mostrarApagar(convidado, 'Sem ligação ao servidor. Tenta outra vez.');
+    }
+    if (!r.ok) {
+      return mostrarApagar(convidado, r.erro === 'credenciais' ? 'Palavra-passe incorreta.'
+        : (ERROS_CONTA[r.erro] ?? 'Não foi possível apagar. Tenta outra vez.'));
+    }
+    esquecerId(); userId = null; estadoAtual = null;
+    ecra.innerHTML = `<section class="cartao resultado ok aparecer"><div class="icone">${ui.ICONES.check}</div>
+      <h1>Dados apagados</h1><p>Apagámos tudo o que estava associado a ${convidado ? 'este telemóvel' : 'esta conta'}. Obrigado por teres participado.</p>
+      <a class="btn secundario" href="../">Voltar ao início</a></section>`;
+  });
 }
 
 /** Convite para criar conta (só para quem está sem conta). */
@@ -445,7 +486,11 @@ function blocoRota(rota, total, estaSubidaM, { sujeito, chegou, extra = '' }) {
     <div class="marcos" aria-hidden="true">${ticks}</div>
     <p style="margin:0 0 6px">${proximoTxt}</p>
     ${extra}
-    <ul class="lista-marcos">${lista}</ul>`;
+    <details class="mais-metas" style="margin-top:8px">
+      <summary><span>Ver todas as metas</span> <span class="muted" style="text-decoration:none;font-weight:600">
+        (${p.marcos.filter((m) => m.altitude <= p.atual).length} de ${p.marcos.length})</span></summary>
+      <ul class="lista-marcos">${lista}</ul>
+    </details>`;
 }
 
 // Versão A — objetivo GLOBAL: os metros de toda a UMa.
@@ -480,7 +525,7 @@ function desenharComum() {
   if (!alvo || !estadoAtual?.existe) return;
   const r = resumo(estadoAtual);
   const novas = ui.medalhasNovas(r);
-  alvo.innerHTML = ui.cartaoMeta(r) + ui.cartaoSequencia(r) + ui.cartaoMedalhas(r, novas);
+  alvo.innerHTML = ui.cartaoSemana(r) + ui.cartaoMedalhas(r, novas);
 }
 
 function animar() {

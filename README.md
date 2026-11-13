@@ -77,7 +77,7 @@ Segurança:
 Ficheiro: `supabase/migrations/20261113000000_schema.sql`.
 
 - Tabelas: `config`, `pisos`, `contas`, `login_tentativas`, `participantes`, `scans`, `painel_tentativas`. Têm RLS ativo e nenhuma política, e as permissões foram retiradas a `anon`/`authenticated`: a chave pública só consegue chamar as RPC.
-- RPC: `criar_conta`, `entrar`, `recuperar_conta`, `novo_codigo_recuperacao`, `registar_scan`, `estado_utilizador`, `progresso_coletivo`, `definir_meta`, `painel` (password), `pisos_qr` (password).
+- RPC: `criar_conta`, `entrar`, `recuperar_conta`, `novo_codigo_recuperacao`, `apagar_dados`, `registar_scan`, `estado_utilizador`, `progresso_coletivo`, `definir_meta`, `painel` (password), `pisos_qr` (password).
 - A base de dados guarda pisos/andares, não metros. Os metros calculam-se sempre com as alturas atuais do `config.js`.
 - Rate limit por ID: no mínimo 2 s entre scans e no máximo 60 scans por hora.
 - O workflow `.github/workflows/manter-ativo.yml` chama `progresso_coletivo()` uma vez por dia, para o plano Free não pausar o projeto.
@@ -163,6 +163,13 @@ O ficheiro `.env` (fora do git) guarda a password da base de dados e a do painel
 
 Para este estudo (cerca de 60 pessoas, alguns milhares de scans), o uso fica muito abaixo dos limites gratuitos. Cada scan ocupa menos de 1 KB.
 Só seria preciso pagar para ter um domínio próprio (cerca de 10 €/ano, opcional) ou o Supabase Pro (cerca de 25 $/mês, que não pausa e faz backups diários). Nenhum dos dois é necessário.
+
+## Privacidade e termos
+
+- `/privacidade/`: política de privacidade (RGPD). Diz que dados se guardam, para que servem, a base legal (consentimento), onde ficam (Supabase na UE), durante quanto tempo e quais são os direitos de quem participa.
+- `/termos/`: termos de utilização. Participação voluntária, segurança (não correr, usar o elevador se for preciso), utilização justa e natureza académica do projeto.
+- **Apagar dados:** em "O meu progresso" → "A minha conta" → *Apagar a minha conta e dados* (pede a palavra-passe). Quem não tem conta usa *Apagar os meus dados*. Apaga a conta, o participante e todas as leituras.
+- Em `config.js`, preenche `contacto` (email do grupo ou do docente) e confirma `dadosApagadosAte`, a data até à qual os dados individuais são apagados.
 
 ## Ética
 

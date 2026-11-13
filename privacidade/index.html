@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#FBF7F2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141110" media="(prefers-color-scheme: dark)">
+  <title>Privacidade · Sobe+</title>
+  <link rel="icon" href="../assets/img/icone.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/app.css">
+</head>
+<body>
+  <div class="app">
+    <div id="topo"></div>
+    <main class="pilha texto-legal">
+      <h1>Política de privacidade</h1>
+      <p class="muted">Última atualização: 13 de novembro de 2026</p>
+
+      <section class="cartao destaque">
+        <p style="margin:0"><strong>Em resumo:</strong> guardamos só o necessário para contar subidas pela escada. Não pedimos nome,
+          email, número de aluno, localização nem dados de saúde. Podes apagar tudo a qualquer momento.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>Quem é responsável</h2>
+        <p>O Sobe+ é um projeto académico de Persuasive Computing da Universidade da Madeira (UMa).
+          <span id="contacto"></span></p>
+      </section>
+
+      <section class="cartao">
+        <h2>Que dados guardamos</h2>
+        <ul>
+          <li><strong>ID anónimo</strong>: um código aleatório criado no teu telemóvel e guardado num cookie e no armazenamento local.
+            Não te identifica.</li>
+          <li><strong>Leituras dos QR</strong>: o piso, a data e hora (do servidor) e se a subida foi válida.</li>
+          <li><strong>Se criares conta</strong>: a alcunha que escolheres, a palavra-passe e o código de recuperação.
+            A palavra-passe e o código ficam guardados cifrados, e ninguém os consegue ler, nem nós.</li>
+          <li><strong>Preferências</strong>: a meta semanal, se a escolheres.</li>
+          <li><strong>Grupo do estudo</strong>: com conta, ficas num de dois grupos (feedback coletivo ou pessoal).</li>
+        </ul>
+        <p style="margin:0"><strong>Não guardamos</strong> nome, email, número de aluno, localização GPS, fotografias nem dados de saúde.
+          Escolhe uma alcunha que não te identifique.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>Para que usamos</h2>
+        <ul>
+          <li>Contar as tuas subidas e mostrar o teu progresso, a meta, a sequência e as medalhas.</li>
+          <li>Somar as subidas de todos para o objetivo coletivo da UMa.</li>
+          <li>Um estudo académico que compara duas formas de feedback. Os resultados são publicados só de forma agregada e anónima.</li>
+        </ul>
+        <p style="margin:0">Não há publicidade, perfis comerciais nem venda de dados. Não usamos ferramentas de análise
+          nem rastreadores.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>Base legal</h2>
+        <p style="margin:0">O teu consentimento (artigo 6.º, n.º 1, alínea a) do RGPD), dado quando aceitas começar.
+          Podes retirá-lo quando quiseres, apagando os teus dados.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>Câmara</h2>
+        <p style="margin:0">Se usares o botão "Ler QR do piso", a imagem da câmara é analisada só no teu telemóvel,
+          para encontrar o QR. Não é gravada nem enviada para lado nenhum.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>Onde ficam os dados e quem os trata</h2>
+        <ul>
+          <li><strong>Supabase</strong> (base de dados), num servidor na União Europeia (Irlanda).</li>
+          <li><strong>GitHub Pages</strong> (alojamento do site).</li>
+          <li><strong>Google Fonts</strong> (tipo de letra), <strong>jsDelivr</strong> e <strong>cdnjs</strong> (biblioteca do leitor de QR).</li>
+        </ul>
+        <p style="margin:0">Como qualquer site, estes serviços recebem tecnicamente o endereço IP do teu dispositivo para entregarem
+          as páginas. Nós não guardamos endereços IP.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>Durante quanto tempo</h2>
+        <p style="margin:0">Os dados individuais são guardados durante o projeto e apagados até <strong id="ate"></strong>.
+          Os resultados agregados e anónimos (por exemplo, médias por grupo) podem ser usados no relatório do projeto.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>Os teus direitos</h2>
+        <p>Tens direito a aceder aos teus dados, a corrigi-los, a apagá-los e a retirar o consentimento.</p>
+        <ul>
+          <li><strong>Ver os teus dados</strong>: o ecrã "O meu progresso" mostra tudo o que está associado ao teu ID.</li>
+          <li><strong>Apagar tudo</strong>: em "O meu progresso", carrega em <em>Apagar a minha conta e dados</em>.
+            Apagamos a conta e todas as leituras, que deixam também de contar para o total da UMa.</li>
+        </ul>
+        <p style="margin:0">Também podes apresentar reclamação à Comissão Nacional de Proteção de Dados (CNPD).</p>
+      </section>
+
+      <section class="cartao">
+        <h2>Cookies e armazenamento local</h2>
+        <p style="margin:0">Usamos um único cookie e o armazenamento local do browser, só para guardar o teu ID anónimo
+          (e, com conta, a tua alcunha neste telemóvel). Não há cookies de publicidade nem de terceiros.</p>
+      </section>
+    </main>
+    <div id="rodape"></div>
+  </div>
+  <script type="module">
+    import { CONFIG } from '../config.js';
+    import * as ui from '../assets/js/ui.js';
+    document.getElementById('topo').innerHTML = ui.cabecalho('../');
+    document.getElementById('rodape').innerHTML = ui.rodape('../');
+    document.getElementById('ate').textContent = new Date(`${CONFIG.dadosApagadosAte}T12:00:00Z`)
+      .toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const c = document.getElementById('contacto');
+    if (CONFIG.contacto) {
+      c.append('Contacto: ');
+      const a = Object.assign(document.createElement('a'), { href: `mailto:${CONFIG.contacto}`, textContent: CONFIG.contacto });
+      c.append(a, '.');
+    } else {
+      c.textContent = 'Para qualquer pedido sobre os teus dados, fala com a equipa do projeto ou com o docente da unidade curricular.';
+    }
+  </script>
+</body>
+</html>

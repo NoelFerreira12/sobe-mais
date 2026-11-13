@@ -131,6 +131,21 @@ try {
   verificar('Conta criada depois de usar sem conta fica marcada (ex_convidado)',
     marcas.find((m) => m.utilizador === nomeEx)?.ex_convidado === true && marcas.find((m) => m.utilizador !== nomeEx)?.ex_convidado === false);
 
+  // ---------- Apagar dados (RGPD) ----------
+  const idApagar = await novoId();
+  await rpc('registar_scan', { p_user_id: idApagar, p_token: tok[2] });
+  const apErrada = await rpc('apagar_dados', { p_user_id: idApagar, p_password: 'errada!!' });
+  verificar('Apagar conta com palavra-passe errada é recusado', apErrada.ok === false && apErrada.erro === 'credenciais');
+  const apOk = await rpc('apagar_dados', { p_user_id: idApagar, p_password: PW_TESTE });
+  const restoA = JSON.parse(sql(`select (select count(*) from public.scans where user_id = ${lit(idApagar)})::int as s,
+    (select count(*) from public.contas where user_id = ${lit(idApagar)})::int as c;`)).rows[0];
+  verificar('Apagar conta apaga a conta e todas as leituras', apOk.ok && restoA.s === 0 && restoA.c === 0, JSON.stringify(restoA));
+  const convApagar = randomUUID(); convidados.push(convApagar);
+  await rpc('registar_scan', { p_user_id: convApagar, p_token: tok[1] });
+  const apConv = await rpc('apagar_dados', { p_user_id: convApagar });
+  const restoConv = JSON.parse(sql(`select count(*)::int as s from public.scans where user_id = ${lit(convApagar)};`)).rows[0].s;
+  verificar('Sem conta: apagar os dados só com o ID do telemóvel', apConv.ok && restoConv === 0);
+
   // ---------- Equilíbrio A/B ----------
   const contagem = JSON.parse(sql(`select variante, count(*)::int as n from public.participantes
     where user_id in (${ids.map(lit).join(',')}) and variante in ('A','B') group by 1;`)).rows;
