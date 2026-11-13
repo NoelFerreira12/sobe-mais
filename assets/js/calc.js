@@ -13,13 +13,17 @@ export function metrosSubida(origem, destino) {
   return m;
 }
 
-/** Progresso na montanha virtual; ao chegar ao topo recomeça (2.ª subida, ...). */
-export function progressoMontanha(total) {
-  const topo = CONFIG.topo.altitude;
-  const voltas = Math.floor(total / topo);
-  const atual = total - voltas * topo;
-  const proximo = CONFIG.marcos.find((m) => m.altitude > atual) ?? CONFIG.marcos.at(-1);
-  return { voltas, subidaN: voltas + 1, atual, pct: atual / topo, proximo, falta: proximo.altitude - atual };
+/** Progresso numa rota (o último marco é o topo); ao chegar ao topo recomeça (2.ª subida, ...). */
+export function progressoRota(total, rota) {
+  const marcos = [...rota.marcos].sort((a, b) => a.altitude - b.altitude);
+  const topo = marcos.at(-1);
+  const voltas = Math.floor(total / topo.altitude);
+  const atual = total - voltas * topo.altitude;
+  const proximo = marcos.find((m) => m.altitude > atual) ?? topo;
+  return {
+    marcos, topo, voltas, subidaN: voltas + 1, atual,
+    pct: atual / topo.altitude, proximo, falta: proximo.altitude - atual,
+  };
 }
 
 // ---------- Datas (strings AAAA-MM-DD vindas do servidor, hora da Madeira) ----------

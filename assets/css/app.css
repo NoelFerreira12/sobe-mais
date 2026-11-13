@@ -217,6 +217,18 @@ input[type="password"], input[type="text"] {
   background: var(--superficie); color: var(--texto); font: 600 1.1rem var(--fonte);
 }
 
+/* Conta */
+.separadores { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 16px; border-radius: 16px; background: var(--superficie-2); }
+.separadores button {
+  min-height: 46px; border: 0; border-radius: 12px; background: transparent; color: var(--texto-2);
+  font: 700 1rem var(--fonte); cursor: pointer;
+}
+.separadores button[aria-selected="true"] { background: var(--superficie); color: var(--texto); box-shadow: 0 1px 4px rgba(0, 0, 0, .08); }
+.separadores button:focus-visible { outline: 3px solid var(--laranja); outline-offset: 2px; }
+label { display: block; margin-bottom: 6px; }
+.ola { margin: 4px 0 12px; font-size: 1.1rem; color: var(--texto-2); }
+.ola strong { color: var(--texto); }
+
 /* Leitor de QR dentro da app */
 .leitor { position: fixed; inset: 0; z-index: 100; background: #000; color: #fff; }
 .leitor video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

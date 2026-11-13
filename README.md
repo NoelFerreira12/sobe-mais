@@ -35,19 +35,37 @@ O site tem um `manifest.webmanifest`, por isso pode ser instalado no telemóvel 
 
 ### Teste A/B
 
-A **única** diferença entre as versões é o ecrã que aparece depois de uma subida válida:
+Há dois tipos de utilizadores, sorteados ao acaso (50/50) no primeiro scan. A **única** diferença entre eles é o ecrã que aparece depois de uma subida válida:
 
-- **A**: barra coletiva da UMa até ao Pico Ruivo (1862 m), com os metros totais e o próximo marco (Cabo Girão 580 m, Encumeada 1007 m, Pico do Arieiro 1818 m, Pico Ruivo 1862 m). Quando se chega ao topo, a contagem recomeça (2.ª subida).
-- **B**: só o contador pessoal (subidas, andares, metros).
+- **A · objetivo global:** "A UMa a subir o Pico Ruivo". Uma barra com os metros de **todos** os participantes juntos e metas intermédias da Madeira:
 
-O servidor só envia os números coletivos às respostas da versão A. As páginas comuns (início, estado, meta, sequência, medalhas) não mostram números coletivos a ninguém, e o ecrã inicial nem fala do Pico Ruivo, para não contaminar a versão B.
+  Fortaleza do Pico 111 m · Pico do Facho 280 m · Farol da Ponta do Pargo 312 m · Pico dos Barcelos 355 m · Cabo Girão 580 m · Ribeiro Frio ≈ 900 m · Encumeada 1007 m · Achada do Teixeira ≈ 1600 m · Pico do Arieiro 1818 m · **Pico Ruivo 1862 m**
+
+- **B · objetivo individual:** "A tua subida ao Cabo Girão". A mesma apresentação (barra, metas da Madeira, próxima meta), mas só com os metros **da própria pessoa** e numa escala pessoal, mais o contador pessoal (subidas, andares, metros):
+
+  Fortaleza do Pico 111 m · Pico do Facho 280 m · Miradouro do Pináculo 283 m · Farol da Ponta do Pargo 312 m · Pico dos Barcelos 355 m · **Cabo Girão 580 m**
+
+Ao chegar ao topo, a contagem recomeça (2.ª subida) e o ecrã indica-o. Quando se passa uma meta intermédia, aparece um destaque ("Chegaste ao Pico do Facho!" / "A UMa chegou ao Pico do Facho!").
+As rotas e as altitudes estão em `config.js` (`rotaColetiva`, `rotaIndividual`). Fontes das altitudes: Visit Madeira e geodiversidade.madeira.gov.pt. Os valores com ≈ são aproximados.
+
+O servidor só envia os números coletivos às respostas da versão A. As páginas comuns (início, progresso, meta, sequência, medalhas) não mostram números coletivos a ninguém. O painel compara os dois grupos para ver qual consegue melhor resultado.
+
+### Contas (login)
+
+Cada utilizador tem de ter conta para participar: **nome de utilizador (alcunha) + palavra-passe**, sem email.
+
+- A conta é criada no primeiro QR (ou em `/s/`). Com a mesma alcunha e palavra-passe pode entrar-se noutro telemóvel e o progresso continua.
+- A palavra-passe é guardada com bcrypt (`pgcrypto`). Há bloqueio de 15 min após 10 tentativas falhadas por nome.
+- `registar_scan` recusa IDs sem conta. Cada pessoa conta como um só participante, mesmo que troque de telemóvel.
+- O painel e o CSV nunca mostram os nomes de utilizador, só pseudónimos (P001, …).
+- Não há recuperação de palavra-passe (não há email). Se alguém a esquecer, cria uma conta nova.
 
 ### Base de dados
 
 Ficheiro: `supabase/migrations/20261113000000_schema.sql`.
 
-- Tabelas: `config`, `pisos`, `participantes`, `scans`, `painel_tentativas`. Têm RLS ativo e nenhuma política, e as permissões foram retiradas a `anon`/`authenticated`: a chave pública só consegue chamar as RPC.
-- RPC: `registar_scan`, `estado_utilizador`, `progresso_coletivo`, `definir_meta`, `painel` (password), `pisos_qr` (password).
+- Tabelas: `config`, `pisos`, `contas`, `login_tentativas`, `participantes`, `scans`, `painel_tentativas`. Têm RLS ativo e nenhuma política, e as permissões foram retiradas a `anon`/`authenticated`: a chave pública só consegue chamar as RPC.
+- RPC: `criar_conta`, `entrar`, `registar_scan`, `estado_utilizador`, `progresso_coletivo`, `definir_meta`, `painel` (password), `pisos_qr` (password).
 - A base de dados guarda pisos/andares, não metros. Os metros calculam-se sempre com as alturas atuais do `config.js`.
 - Rate limit por ID: no mínimo 2 s entre scans e no máximo 60 scans por hora.
 - O workflow `.github/workflows/manter-ativo.yml` chama `progresso_coletivo()` uma vez por dia, para o plano Free não pausar o projeto.
@@ -136,6 +154,6 @@ Só seria preciso pagar para ter um domínio próprio (cerca de 10 €/ano, opci
 
 ## Ética
 
-- Participação voluntária, sem contas nem dados pessoais. Só se guarda um ID anónimo aleatório e a hora dos scans.
+- Participação voluntária. A conta tem só uma alcunha e uma palavra-passe (sem email). Nos dados do estudo, cada pessoa é um ID anónimo, com a hora dos scans.
 - Não há rankings individuais. As medalhas premeiam a regularidade, não a quantidade.
 - Nenhuma mensagem envergonha quem usa o elevador nem incentiva a subir à pressa. Quem precisa do elevador deve usá-lo.

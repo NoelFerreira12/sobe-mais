@@ -23,6 +23,17 @@ export function lerId() {
   return id;
 }
 
+/** Guarda o ID devolvido pelo login (e o nome, só para mostrar neste telemóvel). */
+export function definirId(id, nome = '') {
+  if (!UUID_RE.test(id || '')) throw new Error('ID inválido');
+  guardar(id);
+  try { localStorage.setItem('sobe_nome', nome); } catch { /* */ }
+}
+
+export function lerNome() {
+  try { return localStorage.getItem('sobe_nome') || ''; } catch { return ''; }
+}
+
 export function criarId() {
   let id;
   if (crypto.randomUUID) id = crypto.randomUUID();
@@ -37,6 +48,6 @@ export function criarId() {
 }
 
 export function esquecerId() {
-  try { localStorage.removeItem(CHAVE); localStorage.removeItem('sobe_medalhas'); } catch { /* */ }
+  try { ['sobe_medalhas', 'sobe_nome', CHAVE].forEach((k) => localStorage.removeItem(k)); } catch { /* */ }
   document.cookie = `${CHAVE}=; Max-Age=0; Path=${CAMINHO}`;
 }

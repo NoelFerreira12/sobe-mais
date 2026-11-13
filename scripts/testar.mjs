@@ -14,7 +14,16 @@ if (!r0.ok) { console.error('pisos_qr falhou', r0); process.exit(1); }
 for (const p of r0.pisos) tok[p.piso] = p.token;
 
 const ids = [];
-const novoId = () => { const id = randomUUID(); ids.push(id); return id; };
+const nomes = [];
+const PW_TESTE = 'teste-123456';
+/** Cria uma conta de teste e devolve o user_id. */
+async function novoId() {
+  const nome = `t_${randomUUID().slice(0, 8)}`;
+  const r = await rpc('criar_conta', { p_utilizador: nome, p_password: PW_TESTE });
+  if (!r.ok) throw new Error(`criar_conta falhou: ${JSON.stringify(r)}`);
+  ids.push(r.user_id); nomes.push(nome);
+  return r.user_id;
+}
 const scan = (id, piso) => rpc('registar_scan', { p_user_id: id, p_token: tok[piso] });
 const respostas = []; // todas as respostas, para verificar a separação A/B
 const resultados = [];
@@ -26,7 +35,8 @@ function verificar(nome, cond, detalhe = '') {
 }
 
 /** Sequência de scans: [[piso, esperaAntesEmSeg], ...] — devolve as respostas. */
-async function sequencia(passos, id = novoId()) {
+async function sequencia(passos) {
+  const id = await novoId();
   const out = [];
   for (const [piso, espera] of passos) {
     if (espera) await esperar(espera * 1000);
@@ -57,7 +67,7 @@ try {
     sequencia([[2, 0], [1, 5]]),
     sequencia([[-3, 0], [-2, 15], [-1, 15]]),
     sequencia([[-1, 0], [-1, 3]]),
-    rpc('registar_scan', { p_user_id: novoId(), p_token: 'piso-3' }),
+    novoId().then((id) => rpc('registar_scan', { p_user_id: id, p_token: 'piso-3' })),
     // IDs extra para garantir que há participantes A e B com subidas válidas
     Promise.all(Array.from({ length: 6 }, () => sequencia([[-1, 0], [0, 13]]))),
   ]);
@@ -100,6 +110,26 @@ try {
   const mudou = JSON.parse(sql(`select count(distinct variante) as n from public.scans where user_id in (${lista}) group by user_id having count(distinct variante) > 1;`)).rows;
   verificar('A variante de cada ID nunca muda', mudou.length === 0);
 
+  // ---------- Contas / login ----------
+  const semConta = await rpc('registar_scan', { p_user_id: randomUUID(), p_token: tok[0] });
+  verificar('Scan sem conta é recusado', semConta.ok === false && semConta.erro === 'sem_conta', JSON.stringify(semConta));
+  const dup = await rpc('criar_conta', { p_utilizador: nomes[0], p_password: 'outra-pass' });
+  verificar('Nome de utilizador repetido é recusado', dup.ok === false && dup.erro === 'utilizador_existe', JSON.stringify(dup));
+  const mau = await rpc('criar_conta', { p_utilizador: 'Nome Com Espaços!', p_password: 'abcdef' });
+  verificar('Nome de utilizador inválido é recusado', mau.ok === false && mau.erro === 'utilizador_invalido');
+  const curta = await rpc('criar_conta', { p_utilizador: `t_${randomUUID().slice(0, 8)}`, p_password: '123' });
+  verificar('Palavra-passe curta é recusada', curta.ok === false && curta.erro === 'password_curta');
+  const errada = await rpc('entrar', { p_utilizador: nomes[0], p_password: 'errada!!' });
+  verificar('Login com palavra-passe errada é recusado', errada.ok === false && errada.erro === 'credenciais');
+  const certo = await rpc('entrar', { p_utilizador: nomes[0].toUpperCase(), p_password: PW_TESTE });
+  verificar('Login certo devolve o mesmo ID (noutro telemóvel)', certo.ok && certo.user_id === ids[0], JSON.stringify(certo));
+  const est = await rpc('estado_utilizador', { p_user_id: ids[0] });
+  verificar('estado_utilizador devolve conta e nome', est.conta === true && est.utilizador === nomes[0]);
+  verificar('anon não lê a tabela contas', await (async () => {
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/contas?select=*`, { headers: { apikey: CONFIG.supabaseKey } });
+    return !r.ok || (await r.text()).trim() === '[]';
+  })());
+
   // ---------- Segurança ----------
   const proibido = async (caminho, opcoes) => {
     const headers = { apikey: CONFIG.supabaseKey, 'Content-Type': 'application/json' };
@@ -130,7 +160,8 @@ try {
     console.log(`(estudo_inicio reposto = ${inicioOriginal})`);
   }
   if (ids.length) {
-    sql(`delete from public.participantes where user_id in (${ids.map(lit).join(',')});
+    sql(`delete from public.contas where user_id in (${ids.map(lit).join(',')});
+         delete from public.login_tentativas where utilizador like 't\\_%' or utilizador = 'nome com espaços!';
          delete from public.painel_tentativas;`);
     const resto = JSON.parse(sql(`select count(*)::int as n from public.scans where user_id in (${ids.map(lit).join(',')});`)).rows[0].n;
     console.log(`IDs de teste apagados (${ids.length}); scans restantes desses IDs: ${resto}`);

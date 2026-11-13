@@ -1,7 +1,7 @@
 import { CONFIG } from '../../config.js';
 import { rpc } from './api.js';
-import { lerId, criarId } from './id.js';
-import { resumo, metros, metrosSubida, progressoMontanha } from './calc.js';
+import { lerId, definirId, esquecerId } from './id.js';
+import { resumo, metros, metrosSubida, progressoRota } from './calc.js';
 import * as ui from './ui.js';
 import { lerQR } from './leitor.js';
 
@@ -39,11 +39,11 @@ function arrancar() {
   if (abrirCamara) history.replaceState(null, '', location.pathname);
   const token = tokenDoPedido();
   userId = lerId();
-  if (token && !userId) return mostrarConsentimento(token);
+  if (token && !userId) return mostrarConta(token);
   if (token) return registar(token);
   if (abrirCamara) setTimeout(abrirLeitor, 0);
   if (userId) return mostrarEstado();
-  return mostrarSemId();
+  return mostrarConta(null);
 }
 
 // Leitura do QR dentro da app: o token lido segue exatamente o mesmo caminho
@@ -57,7 +57,7 @@ async function abrirLeitor() {
   }
   if (!token) return;
   userId = lerId();
-  if (!userId) return mostrarConsentimento(token);
+  if (!userId) return mostrarConta(token);
   registar(token);
 }
 
@@ -79,33 +79,74 @@ function mostrarErroCamara(codigo) {
 // ---------------------------------------------------------------------
 // Ecrãs
 // ---------------------------------------------------------------------
-function mostrarConsentimento(token) {
-  ecra.innerHTML = `
-    <div class="hero aparecer"><div class="ilustracao">${ui.MONTANHA}</div>
-      <h1>Bem-vindo ao Sobe<span style="color:var(--laranja)">+</span></h1>
-      <p>Troca o elevador pela escada sempre que puderes. Sem app e sem conta.</p></div>
-    <section class="cartao aparecer aparecer-2">
-      <h2>Antes de começar</h2>
-      <p><strong>Registamos um ID anónimo e a hora a que lês os QR, só para contar subidas.</strong></p>
-      <p class="muted pequeno">Não pedimos nome, email, número de aluno, localização nem dados de saúde.
-        Participar é voluntário e, se precisares do elevador, usa-o sem hesitar.</p>
-      <button class="btn" id="aceitar">Aceitar e começar</button>
-      <p class="centro" style="margin:12px 0 0"><a href="../#etica">Saber mais</a></p>
-    </section>`;
-  document.getElementById('aceitar').addEventListener('click', () => {
-    userId = criarId();
-    registar(token);
-  });
-}
+// ---------------------------------------------------------------------
+// Conta: cada utilizador entra com nome de utilizador + palavra-passe (sem email).
+// O token lido (se houver) fica à espera e é registado logo a seguir ao login.
+// ---------------------------------------------------------------------
+const ERROS_CONTA = {
+  utilizador_invalido: 'O nome tem de ter 3 a 24 caracteres: letras minúsculas, números, ponto, hífen ou _.',
+  password_curta: 'A palavra-passe tem de ter pelo menos 6 caracteres.',
+  utilizador_existe: 'Esse nome já está a ser usado. Escolhe outro ou entra na tua conta.',
+  credenciais: 'Nome ou palavra-passe incorretos.',
+  bloqueado: 'Demasiadas tentativas falhadas. Espera 15 minutos.',
+  muitas_contas: 'Muitas contas criadas agora mesmo. Tenta daqui a pouco.',
+};
 
-function mostrarSemId() {
+function mostrarConta(token, modo = 'criar', erro = '', nome = '') {
+  const criar = modo === 'criar';
   ecra.innerHTML = `
-    <div class="hero aparecer"><div class="ilustracao">${ui.MONTANHA}</div>
-      <h1>Sobe<span style="color:var(--laranja)">+</span></h1>
-      <p>Para participar, lê um dos QR do Sobe+ que estão junto às escadas.</p></div>
-    <div class="aparecer aparecer-2" style="margin-bottom:14px">${botaoLer()}</div>
-    <section class="cartao destaque aparecer aparecer-2"><p style="margin:0">${ui.fraseComparacao(CONFIG)}</p></section>
-    <p class="centro" style="margin-top:20px"><a href="../">Como funciona</a></p>`;
+    <div class="hero aparecer" style="padding-bottom:0"><div class="ilustracao" style="width:min(170px,50%)">${ui.MONTANHA}</div>
+      <h1>${token ? 'Quase lá!' : `Sobe<span style="color:var(--laranja)">+</span>`}</h1>
+      <p>${token ? 'Entra ou cria a tua conta para esta leitura contar.' : 'Entra ou cria a tua conta para participar.'}</p></div>
+    <section class="cartao aparecer aparecer-2">
+      <div class="separadores" role="tablist" aria-label="Conta">
+        <button type="button" role="tab" data-modo="criar" aria-selected="${criar}">Criar conta</button>
+        <button type="button" role="tab" data-modo="entrar" aria-selected="${!criar}">Já tenho conta</button>
+      </div>
+      <form id="form-conta" class="pilha" novalidate>
+        <div>
+          <label for="u"><strong>Nome de utilizador</strong></label>
+          <input type="text" id="u" name="username" autocomplete="username" autocapitalize="none" autocorrect="off"
+            spellcheck="false" minlength="3" maxlength="24" required value="${nome.replace(/[^a-z0-9._-]/gi, '')}">
+          ${criar ? '<p class="muted pequeno" style="margin:6px 0 0">Usa uma alcunha. Não uses o teu nome verdadeiro nem o número de aluno.</p>' : ''}
+        </div>
+        <div>
+          <label for="pw"><strong>Palavra-passe</strong></label>
+          <input type="password" id="pw" name="password" autocomplete="${criar ? 'new-password' : 'current-password'}" minlength="6" maxlength="72" required>
+          ${criar ? '<p class="muted pequeno" style="margin:6px 0 0">Mínimo 6 caracteres. Não pedimos email, por isso guarda-a bem.</p>' : ''}
+        </div>
+        ${criar ? `<div class="aviso-caixa">
+          <p style="margin:0"><strong>Registamos um ID anónimo e a hora a que lês os QR, só para contar subidas.</strong></p>
+          <p class="pequeno" style="margin:6px 0 0">Não pedimos email, número de aluno, localização nem dados de saúde.
+            Participar é voluntário e, se precisares do elevador, usa-o sem hesitar. <a href="../#etica">Saber mais</a></p>
+        </div>` : ''}
+        ${erro ? `<p class="aviso-caixa" role="alert" style="margin:0">${erro}</p>` : ''}
+        <button class="btn" type="submit">${criar ? 'Aceitar e criar conta' : 'Entrar'}</button>
+      </form>
+    </section>
+    ${token ? '' : `<p class="muted centro pequeno" style="margin-top:16px">${ui.fraseComparacao(CONFIG)}</p>`}`;
+
+  ecra.querySelectorAll('[data-modo]').forEach((b) => b.addEventListener('click', () => {
+    mostrarConta(token, b.dataset.modo, '', document.getElementById('u').value);
+  }));
+  document.getElementById('form-conta').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const u = document.getElementById('u').value.trim().toLowerCase();
+    const pw = document.getElementById('pw').value;
+    const btn = ev.submitter || ev.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    let r;
+    try {
+      r = await rpc(criar ? 'criar_conta' : 'entrar', { p_utilizador: u, p_password: pw });
+    } catch (e) {
+      console.error(e);
+      return mostrarConta(token, modo, 'Sem ligação ao servidor. Tenta outra vez.', u);
+    }
+    if (!r.ok) return mostrarConta(token, modo, ERROS_CONTA[r.erro] ?? 'Algo correu mal. Tenta outra vez.', u);
+    definirId(r.user_id, r.utilizador);
+    userId = r.user_id;
+    if (token) registar(token); else mostrarEstado();
+  });
 }
 
 function carregar(txt = 'A registar…') {
@@ -122,6 +163,10 @@ async function registar(token) {
     return mostrarErroRede(token);
   }
   limparPendente();
+  if (!r.ok && r.erro === 'sem_conta') {
+    esquecerId(); userId = null;
+    return mostrarConta(token, 'entrar', 'A tua sessão terminou. Entra outra vez para esta leitura contar.');
+  }
   if (!r.ok) return mostrarErro(r.erro);
   estadoAtual = r.estado;
   mostrarResultado(r);
@@ -201,8 +246,9 @@ function mostrarResultado(r) {
   if (r.resultado === 'valida') {
     // A ÚNICA diferença entre versões. O servidor só envia "coletivo" à versão A
     // e "pessoal" à versão B.
-    if (r.coletivo) variante = cartaoColetivo(r.coletivo, metrosSubida(r.piso_origem, r.piso));
-    else if (r.pessoal) variante = cartaoPessoal(r.pessoal);
+    const estaSubida = metrosSubida(r.piso_origem, r.piso);
+    if (r.coletivo) variante = cartaoColetivo(r.coletivo, estaSubida);
+    else if (r.pessoal) variante = cartaoPessoal(r.pessoal, estaSubida);
   }
   ecra.innerHTML = `
     <section class="cartao resultado ${t.cls} aparecer">
@@ -238,7 +284,10 @@ async function mostrarEstado() {
       <button class="btn" onclick="location.reload()">Tentar outra vez</button></section>`;
     return;
   }
-  if (!estadoAtual.existe) return mostrarSemId();
+  if (!estadoAtual.conta) {
+    esquecerId(); userId = null;
+    return mostrarConta(null, 'entrar', 'A tua sessão terminou. Entra outra vez.');
+  }
   const u = estadoAtual.ultimo_scan;
   const maxTopo = Math.max(...CONFIG.pisos);
   const emCurso = u && u.piso < maxTopo &&
@@ -246,62 +295,77 @@ async function mostrarEstado() {
   const aviso = emCurso
     ? `<h2>Estás a meio de uma subida</h2><p style="margin:0">Começaste no ${ui.nomePiso(u.piso)} há ${ui.duracao(u.segundos_desde)}. Sobe e lê o QR quando chegares.</p>`
     : `<h2>Pronto para subir?</h2><p style="margin:0">Lê o QR do piso onde estás para começar uma subida.</p>`;
+  const nome = String(estadoAtual.utilizador || '').replace(/[^a-z0-9._-]/g, '');
   ecra.innerHTML = `
+    <p class="ola aparecer">Olá, <strong>${nome}</strong></p>
     <section class="cartao destaque aparecer">${aviso}</section>
     <div class="aparecer" style="margin-top:14px">${botaoLer()}</div>
     <div id="comum" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>
-    <p class="muted centro pequeno" style="margin-top:18px">${ui.fraseComparacao(CONFIG)}</p>`;
+    <p class="muted centro pequeno" style="margin-top:18px">${ui.fraseComparacao(CONFIG)}</p>
+    <p class="centro" style="margin:8px 0 0"><button class="ligacao-btn" type="button" id="sair">Terminar sessão</button></p>`;
+  document.getElementById('sair').addEventListener('click', () => {
+    esquecerId(); userId = null; estadoAtual = null; mostrarConta(null, 'entrar');
+  });
   desenharComum();
 }
 
 // ---------------------------------------------------------------------
-// Versão A: progresso coletivo da UMa até ao Pico Ruivo
+// Rota pela Madeira (partilhada pelas duas versões; muda só QUEM sobe).
 // ---------------------------------------------------------------------
-function cartaoColetivo(c, minhaSubidaM) {
-  const total = metros(c.lancos);
-  const p = progressoMontanha(total);
-  const antes = progressoMontanha(Math.max(0, total - minhaSubidaM));
+function blocoRota(rota, total, estaSubidaM, { sujeito, chegou, extra = '' }) {
+  const p = progressoRota(total, rota);
+  const antes = progressoRota(Math.max(0, total - estaSubidaM), rota);
+  const topo = p.topo;
   const chegouAoTopo = p.voltas > antes.voltas;
-  const topo = CONFIG.topo;
+  const marcoNovo = !chegouAoTopo && p.marcos.find((m) => m.altitude > antes.atual && m.altitude <= p.atual);
   const pctInicial = antes.voltas === p.voltas ? antes.pct : 0;
-  const marcos = CONFIG.marcos
-    .filter((m) => m.altitude < topo.altitude)
+  const ticks = p.marcos.filter((m) => m !== topo)
     .map((m) => `<i style="left:${(m.altitude / topo.altitude) * 100}%" title="${m.nome}"></i>`).join('');
-  const lista = CONFIG.marcos.map((m) => {
+  const lista = p.marcos.map((m) => {
     const cls = m.altitude <= p.atual ? 'feito' : (m === p.proximo ? 'proximo' : '');
     return `<li class="${cls}"><span>${m.nome}</span><span class="num" style="font-weight:700">${ui.fmt(m.altitude)} m</span></li>`;
   }).join('');
-  const proximoTxt = p.proximo.altitude === topo.altitude
-    ? `Próximo marco: <strong>${topo.nome}</strong>, o topo. Faltam <strong>${ui.fmt(p.falta)} m</strong>.`
-    : `Próximo marco: <strong>${p.proximo.nome}</strong> (${ui.fmt(p.proximo.altitude)} m). Faltam <strong>${ui.fmt(p.falta)} m</strong>.`;
-  return `<section class="cartao destaque" data-variante-ecra="A">
-    <span class="etiqueta">A UMa a subir o ${topo.nome}</span>
-    ${chegouAoTopo ? `<p style="margin:10px 0 4px"><span class="selo">${ui.ICONES.bandeira.replace('<svg', '<svg width="18" height="18"')} Chegámos ao ${topo.nome}!</span></p>` : ''}
+  const proximoTxt = p.proximo === topo
+    ? `Próxima meta: <strong>${topo.nome}</strong>, o topo. Faltam <strong>${ui.fmt(p.falta, 1)} m</strong>.`
+    : `Próxima meta: <strong>${p.proximo.nome}</strong> (${ui.fmt(p.proximo.altitude)} m). Faltam <strong>${ui.fmt(p.falta, 1)} m</strong>.`;
+  const bandeira = ui.ICONES.bandeira.replace('<svg', '<svg width="18" height="18"');
+  return `
+    <span class="etiqueta">${rota.titulo}</span>
+    ${chegouAoTopo ? `<p style="margin:10px 0 4px"><span class="selo">${bandeira} ${chegou(topo.nome)}</span></p>` : ''}
+    ${marcoNovo ? `<p style="margin:10px 0 4px"><span class="selo">${bandeira} ${sujeito} ${marcoNovo.nome}!</span></p>` : ''}
     ${p.voltas >= 1 ? `<p style="margin:8px 0 0"><strong>${p.subidaN}.ª subida ao ${topo.nome}.</strong> A contagem recomeçou.</p>` : ''}
-    <div style="margin:10px 0 12px"><span class="metros-grande num" data-contar="${p.atual}">0</span>
+    <div style="margin:10px 0 12px"><span class="metros-grande num" data-contar="${p.atual}" data-casas="1">0</span>
       <span class="muted"> m de ${ui.fmt(topo.altitude)} m</span></div>
-    <div class="barra" role="progressbar" aria-label="Progresso da UMa até ao ${topo.nome}"
+    <div class="barra" role="progressbar" aria-label="${rota.titulo}"
       aria-valuemin="0" aria-valuemax="${topo.altitude}" aria-valuenow="${Math.round(p.atual)}">
       <span data-de="${pctInicial * 100}" data-ate="${p.pct * 100}"></span></div>
-    <div class="marcos" aria-hidden="true">${marcos}</div>
+    <div class="marcos" aria-hidden="true">${ticks}</div>
     <p style="margin:0 0 6px">${proximoTxt}</p>
-    <p class="muted pequeno" style="margin:0">A tua subida juntou-se a ${ui.fmt(c.subidas)} ${c.subidas === 1 ? 'subida' : 'subidas'} de ${ui.fmt(c.pessoas)} ${c.pessoas === 1 ? 'pessoa' : 'pessoas'} da UMa${p.voltas ? `: ${ui.fmt(total)} m no total` : ''}.</p>
-    <ul class="lista-marcos">${lista}</ul>
+    ${extra}
+    <ul class="lista-marcos">${lista}</ul>`;
+}
+
+// Versão A — objetivo GLOBAL: os metros de toda a UMa.
+function cartaoColetivo(c, estaSubidaM) {
+  const total = metros(c.lancos);
+  const extra = `<p class="muted pequeno" style="margin:0">A tua subida juntou-se a ${ui.fmt(c.subidas)} ${c.subidas === 1 ? 'subida' : 'subidas'} de ${ui.fmt(c.pessoas)} ${c.pessoas === 1 ? 'pessoa' : 'pessoas'} da UMa: ${ui.fmt(total, 1)} m no total.</p>`;
+  return `<section class="cartao destaque" data-variante-ecra="A">
+    ${blocoRota(CONFIG.rotaColetiva, total, estaSubidaM, {
+      sujeito: 'A UMa chegou ao', chegou: (n) => `Chegámos ao ${n}!`, extra })}
   </section>`;
 }
 
-// ---------------------------------------------------------------------
-// Versão B: só o contador pessoal
-// ---------------------------------------------------------------------
-function cartaoPessoal(pe) {
+// Versão B — objetivo INDIVIDUAL: só os metros da própria pessoa.
+function cartaoPessoal(pe, estaSubidaM) {
   const m = metros(pe.lancos);
-  return `<section class="cartao destaque" data-variante-ecra="B">
-    <span class="etiqueta">O teu contador</span>
-    <div class="numeros" style="margin-top:12px">
+  const extra = `<div class="numeros" style="margin:14px 0 4px">
       <div><div class="valor num" data-contar="${pe.subidas}">0</div><div class="rotulo">${pe.subidas === 1 ? 'subida' : 'subidas'}</div></div>
       <div><div class="valor num" data-contar="${pe.andares}">0</div><div class="rotulo">${pe.andares === 1 ? 'andar' : 'andares'}</div></div>
-      <div><div class="valor num" data-contar="${m}">0</div><div class="rotulo">${m === 1 ? 'metro' : 'metros'}</div></div>
-    </div>
+      <div><div class="valor num" data-contar="${m}" data-casas="1">0</div><div class="rotulo">${m === 1 ? 'metro' : 'metros'}</div></div>
+    </div>`;
+  return `<section class="cartao destaque" data-variante-ecra="B">
+    ${blocoRota(CONFIG.rotaIndividual, m, estaSubidaM, {
+      sujeito: 'Chegaste ao', chegou: (n) => `Chegaste ao ${n}!`, extra })}
   </section>`;
 }
 
@@ -317,7 +381,8 @@ function desenharComum() {
 }
 
 function animar() {
-  document.querySelectorAll('[data-contar]').forEach((el) => ui.contar(el, Number(el.dataset.contar)));
+  document.querySelectorAll('[data-contar]').forEach((el) =>
+    ui.contar(el, Number(el.dataset.contar), Number(el.dataset.casas || 0)));
   document.querySelectorAll('.barra > span[data-ate]').forEach((el) => {
     el.style.width = `${el.dataset.de}%`;
     requestAnimationFrame(() => requestAnimationFrame(() => { el.style.width = `${el.dataset.ate}%`; }));

@@ -34,7 +34,8 @@ if (cmd === 'password') {
 } else if (cmd === 'apagar') {
   const ids = args.filter((a) => /^[0-9a-f-]{36}$/i.test(a));
   if (!ids.length) { console.error('Indica pelo menos um UUID.'); process.exit(1); }
-  console.log(sql(`delete from public.participantes where user_id in (${ids.map(lit).join(',')}) returning user_id;`));
+  // Apagar a conta apaga também o participante e os scans (on delete cascade).
+  console.log(sql(`delete from public.contas where user_id in (${ids.map(lit).join(',')}) returning user_id;`));
 } else {
   console.log('Comandos: password [nova] | config:sync | apagar <uuid...>');
   process.exit(1);
