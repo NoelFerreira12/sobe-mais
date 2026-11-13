@@ -3,6 +3,10 @@ import { rpc } from './api.js';
 import { lerId, criarId } from './id.js';
 import { resumo, metros, metrosSubida, progressoMontanha } from './calc.js';
 import * as ui from './ui.js';
+import { lerQR } from './leitor.js';
+
+const botaoLer = (txt = 'Ler QR do piso', cls = '') =>
+  `<button class="btn ${cls}" type="button" data-ler>${ui.ICONES.qr}<span>${txt}</span></button>`;
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
@@ -30,12 +34,46 @@ function tokenDoPedido() {
 const limparPendente = () => { try { sessionStorage.removeItem(PEND); } catch { /* */ } };
 
 function arrancar() {
+  const params = new URLSearchParams(location.search);
+  const abrirCamara = params.get('ler') === '1' && !params.get('p');
+  if (abrirCamara) history.replaceState(null, '', location.pathname);
   const token = tokenDoPedido();
   userId = lerId();
   if (token && !userId) return mostrarConsentimento(token);
   if (token) return registar(token);
+  if (abrirCamara) setTimeout(abrirLeitor, 0);
   if (userId) return mostrarEstado();
   return mostrarSemId();
+}
+
+// Leitura do QR dentro da app: o token lido segue exatamente o mesmo caminho
+// que um QR aberto pela câmara do telemóvel (validação toda no servidor).
+async function abrirLeitor() {
+  let token;
+  try {
+    token = await lerQR();
+  } catch (e) {
+    return mostrarErroCamara(e.message);
+  }
+  if (!token) return;
+  userId = lerId();
+  if (!userId) return mostrarConsentimento(token);
+  registar(token);
+}
+
+function mostrarErroCamara(codigo) {
+  const negado = codigo === 'camara_negada';
+  ecra.innerHTML = `
+    <section class="cartao resultado aviso aparecer">
+      <div class="icone">${ui.ICONES.info}</div>
+      <h1>Não conseguimos abrir a câmara</h1>
+      <p>${negado
+        ? 'Dá permissão à câmara nas definições do browser e tenta outra vez.'
+        : 'Este browser não deixa usar a câmara aqui.'}
+        Também podes ler o QR com a app da câmara do telemóvel: conta da mesma forma.</p>
+      ${botaoLer('Tentar outra vez')}
+    </section>
+    <p class="centro" style="margin-top:16px"><a href="./">Ver o meu progresso</a></p>`;
 }
 
 // ---------------------------------------------------------------------
@@ -65,6 +103,7 @@ function mostrarSemId() {
     <div class="hero aparecer"><div class="ilustracao">${ui.MONTANHA}</div>
       <h1>Sobe<span style="color:var(--laranja)">+</span></h1>
       <p>Para participar, lê um dos QR do Sobe+ que estão junto às escadas.</p></div>
+    <div class="aparecer aparecer-2" style="margin-bottom:14px">${botaoLer()}</div>
     <section class="cartao destaque aparecer aparecer-2"><p style="margin:0">${ui.fraseComparacao(CONFIG)}</p></section>
     <p class="centro" style="margin-top:20px"><a href="../">Como funciona</a></p>`;
 }
@@ -111,6 +150,7 @@ function mostrarErro(codigo) {
   ecra.innerHTML = `
     <section class="cartao resultado aviso aparecer">
       <div class="icone">${ui.ICONES.info}</div><h1>${t}</h1><p>${p}</p>
+      ${botaoLer('Ler outro QR')}
     </section>
     <p class="centro" style="margin-top:16px"><a href="./">Ver o meu progresso</a></p>`;
 }
@@ -172,6 +212,9 @@ function mostrarResultado(r) {
       ${t.texto ? `<p>${t.texto}</p>` : ''}
       ${t.extra ? `<p class="pequeno" style="margin:0">${t.extra}</p>` : ''}
     </section>
+    <div class="aparecer" style="margin-top:14px">${r.resultado === 'inicio' && t.icone !== 'bandeira'
+      ? botaoLer('Ler o QR quando chegares')
+      : botaoLer('Ler o próximo QR', 'secundario')}</div>
     ${variante ? `<div class="aparecer aparecer-2" style="margin-top:14px">${variante}</div>` : ''}
     <div id="comum" class="pilha aparecer aparecer-3" style="margin-top:14px"></div>`;
   desenharComum();
@@ -205,6 +248,7 @@ async function mostrarEstado() {
     : `<h2>Pronto para subir?</h2><p style="margin:0">Lê o QR do piso onde estás para começar uma subida.</p>`;
   ecra.innerHTML = `
     <section class="cartao destaque aparecer">${aviso}</section>
+    <div class="aparecer" style="margin-top:14px">${botaoLer()}</div>
     <div id="comum" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>
     <p class="muted centro pequeno" style="margin-top:18px">${ui.fraseComparacao(CONFIG)}</p>`;
   desenharComum();
@@ -279,6 +323,10 @@ function animar() {
     requestAnimationFrame(() => requestAnimationFrame(() => { el.style.width = `${el.dataset.ate}%`; }));
   });
 }
+
+ecra.addEventListener('click', (ev) => {
+  if (ev.target.closest('[data-ler]')) abrirLeitor();
+});
 
 ecra.addEventListener('click', async (ev) => {
   const b = ev.target.closest('[data-meta]');

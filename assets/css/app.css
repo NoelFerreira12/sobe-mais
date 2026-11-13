@@ -217,6 +217,21 @@ input[type="password"], input[type="text"] {
   background: var(--superficie); color: var(--texto); font: 600 1.1rem var(--fonte);
 }
 
+/* Leitor de QR dentro da app */
+.leitor { position: fixed; inset: 0; z-index: 100; background: #000; color: #fff; }
+.leitor video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.leitor-mira { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.leitor-mira span {
+  width: min(70vw, 300px); aspect-ratio: 1; border-radius: 28px;
+  border: 4px solid #fff; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .45);
+}
+.leitor-topo, .leitor-baixo { position: absolute; left: 0; right: 0; padding: 20px 16px; text-align: center; }
+.leitor-topo { top: 0; padding-top: max(20px, env(safe-area-inset-top)); font-size: 1.15rem; }
+.leitor-topo p { margin: 4px 0 0; font-size: .95rem; opacity: .9; }
+.leitor-baixo { bottom: 0; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+.leitor-baixo .btn { max-width: 360px; background: rgba(255, 255, 255, .92); color: #323232; }
+.btn .ico { width: 24px; height: 24px; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }

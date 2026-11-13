@@ -18,6 +18,7 @@ export const ICONES = {
   info: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.1"/>'),
   subir: svg('<path d="M12 20V5M6 11l6-6 6 6"/>'),
   bandeira: svg('<path d="M6 21V4M6 4h11l-2.5 4L17 12H6"/>'),
+  qr: svg('<rect x="3.5" y="3.5" width="6" height="6" rx="1.2"/><rect x="14.5" y="3.5" width="6" height="6" rx="1.2"/><rect x="3.5" y="14.5" width="6" height="6" rx="1.2"/><path d="M14.5 14.5h2.5v2.5M20.5 14.5v.1M14.5 20.5h.1M17.5 20.5h3v-3"/>', 'class="ico"'),
   repetir: svg('<path d="M4 12a8 8 0 0 1 13.7-5.6L20 9M20 4v5h-5M20 12a8 8 0 0 1-13.7 5.6L4 15M4 20v-5h5"/>'),
 };
 

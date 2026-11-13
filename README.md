@@ -24,6 +24,15 @@ Cada piso tem um QR code. A pessoa lê o QR do piso onde está, sobe e lê o QR 
 4. Cada scan fica gravado com o ID anónimo, o token, o piso, a variante e a hora do servidor.
 5. Uma subida é válida quando há um scan num piso seguido de um scan num piso **mais alto**, com 12 a 180 segundos **por andar** subido. Descer não conta. O piso de chegada serve também de início para a próxima subida. Depois de uma subida válida, as subidas desse ID só voltam a contar passados 5 min. Os scans que não cumprem as regras ficam guardados, mas não contam.
 
+### Ler o QR dentro ou fora da app
+
+As duas formas contam da mesma maneira, porque o token segue sempre o mesmo caminho até ao servidor:
+
+- **Fora da app:** com a app da câmara do telemóvel, que abre o link `…/s/?p=<token>`.
+- **Dentro da app:** com o botão "Ler QR do piso", no ecrã inicial e em todos os ecrãs de `/s/`. A câmara abre dentro da página. Usa o `BarcodeDetector` nativo quando existe (Android/Chrome) e o [jsQR](https://github.com/cozmo/jsQR) nos restantes browsers (iPhone/Safari). QR que não sejam do Sobe+ são ignorados.
+
+O site tem um `manifest.webmanifest`, por isso pode ser instalado no telemóvel ("Adicionar ao ecrã principal"). Fica com ícone próprio, abre em ecrã inteiro e começa no ecrã de progresso, com o botão de leitura.
+
 ### Teste A/B
 
 A **única** diferença entre as versões é o ecrã que aparece depois de uma subida válida:
@@ -112,6 +121,18 @@ npm run password      # gera uma nova password do painel (guardada em .env)
 Os scripts de administração usam o Supabase CLI (`supabase login` + `supabase link --project-ref <ref>`).
 
 O ficheiro `.env` (fora do git) guarda a password da base de dados e a do painel. A chave publicada em `config.js` é a chave pública (publishable/anon), protegida por RLS. A service role key nunca entra no repositório.
+
+## Custos
+
+| Serviço | Plano | Custo |
+|---|---|---|
+| GitHub Pages (site) | grátis em repositórios públicos | 0 € |
+| GitHub Actions (keep-alive diário) | grátis em repositórios públicos | 0 € |
+| Supabase (base de dados) | Free: 500 MB, 5 GB de tráfego/mês, pausa após 7 dias sem atividade | 0 € |
+| Bibliotecas (jsQR, qrcode-generator, Google Fonts) | CDN públicas | 0 € |
+
+Para este estudo (cerca de 60 pessoas, alguns milhares de scans), o uso fica muito abaixo dos limites gratuitos. Cada scan ocupa menos de 1 KB.
+Só seria preciso pagar para ter um domínio próprio (cerca de 10 €/ano, opcional) ou o Supabase Pro (cerca de 25 $/mês, que não pausa e faz backups diários). Nenhum dos dois é necessário.
 
 ## Ética
 
