@@ -137,6 +137,13 @@ try {
   verificar('Depois de recuperar, a palavra-passe antiga deixa de valer', (await rpc('entrar', { p_utilizador: nomeRec, p_password: 'antiga123' })).ok === false);
   const recVelho = await rpc('recuperar_conta', { p_utilizador: nomeRec, p_codigo: contaRec.codigo_recuperacao, p_nova_password: 'outra123' });
   verificar('O código de recuperação antigo deixa de valer', recVelho.ok === false);
+  // Quem esquece a alcunha: o código da SUA conta não muda a palavra-passe de outra conta…
+  const alheio = await rpc('recuperar_conta', { p_utilizador: nomes[0], p_codigo: recOk.codigo_recuperacao, p_nova_password: 'roubada1' });
+  verificar('O meu código não muda a palavra-passe de outra conta', alheio.ok === false);
+  verificar('A outra conta continua a entrar normalmente', (await rpc('entrar', { p_utilizador: nomes[0], p_password: PW_TESTE })).ok === true);
+  // …e só com o código recupera a própria conta e descobre a alcunha.
+  const soCodigo = await rpc('recuperar_conta', { p_utilizador: '', p_codigo: recOk.codigo_recuperacao, p_nova_password: 'nova5678' });
+  verificar('Recuperar só com o código (sem alcunha) devolve a alcunha certa', soCodigo.ok && soCodigo.utilizador === nomeRec, soCodigo.utilizador);
   const novoCod = await rpc('novo_codigo_recuperacao', { p_user_id: contaRec.user_id });
   verificar('Com sessão, gera um código novo', novoCod.ok && /^[A-Z0-9-]{14}$/.test(novoCod.codigo_recuperacao));
   const dup = await rpc('criar_conta', { p_utilizador: nomes[0], p_password: 'outra-pass' });
@@ -196,7 +203,7 @@ try {
     const todos = [...ids, ...convidados].map(lit).join(',');
     sql(`delete from public.participantes where user_id in (${todos});
          delete from public.contas where user_id in (${ids.map(lit).join(',')});
-         delete from public.login_tentativas where utilizador like 't\\_%' or utilizador = 'nome com espaços!';
+         delete from public.login_tentativas where utilizador like 't\\_%' or utilizador in ('nome com espaços!', '*codigo*');
          delete from public.painel_tentativas;`);
     const resto = JSON.parse(sql(`select count(*)::int as n from public.scans where user_id in (${ids.map(lit).join(',')});`)).rows[0].n;
     console.log(`IDs de teste apagados (${ids.length}); scans restantes desses IDs: ${resto}`);

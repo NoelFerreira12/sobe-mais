@@ -88,8 +88,8 @@ const ERROS_CONTA = {
   utilizador_invalido: 'O nome tem de ter 3 a 24 caracteres: letras minúsculas, números, ponto, hífen ou _.',
   password_curta: 'A palavra-passe tem de ter pelo menos 6 caracteres.',
   utilizador_existe: 'Esse nome já está a ser usado. Escolhe outro ou entra na tua conta.',
-  credenciais: 'Nome ou palavra-passe incorretos.',
-  codigo_errado: 'Nome ou código de recuperação incorretos.',
+  credenciais: 'Alcunha ou palavra-passe incorretas. Não tens a certeza da tua alcunha? Toca em «Esqueci-me» e usa só o teu código de recuperação.',
+  codigo_errado: 'Código de recuperação incorreto. Confirma o código (ou deixa a alcunha em branco e usa só o código).',
   bloqueado: 'Demasiadas tentativas falhadas. Espera 15 minutos.',
   muitas_contas: 'Muitas contas criadas agora mesmo. Tenta daqui a pouco.',
 };
@@ -100,7 +100,7 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = [
   const criar = modo === 'criar', recuperar = modo === 'recuperar';
   const titulo = recuperar ? 'Recuperar conta' : (token ? 'Quase lá!' : `Sobe<span style="color:var(--laranja)">+</span>`);
   const sub = recuperar
-    ? 'Usa o código de recuperação que guardaste quando criaste a conta.'
+    ? 'Basta o código de recuperação que guardaste. Se não te lembras da alcunha, deixa-a em branco: dizemos-ta a seguir.'
     : (token ? 'Entra ou cria uma conta. Também podes continuar sem conta.' : 'Entra ou cria uma conta para guardares o teu progresso.');
   ecra.innerHTML = `
     <div class="hero aparecer" style="padding-bottom:0"><div class="ilustracao" style="width:min(170px,50%)">${ui.MONTANHA}</div>
@@ -112,9 +112,9 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = [
       </div>`}
       <form id="form-conta" class="pilha" novalidate>
         <div>
-          <label for="u"><strong>Nome de utilizador</strong></label>
+          <label for="u"><strong>${recuperar ? 'Alcunha <span class="muted" style="font-weight:600">(opcional)</span>' : 'Nome de utilizador (alcunha)'}</strong></label>
           <input type="text" id="u" name="username" autocomplete="username" autocapitalize="none" autocorrect="off"
-            spellcheck="false" minlength="3" maxlength="24" required value="${limpaNome(nome)}">
+            spellcheck="false" minlength="3" maxlength="24" ${recuperar ? '' : 'required'} value="${limpaNome(nome)}">
           ${criar ? '<p class="muted pequeno" style="margin:6px 0 0">Usa uma alcunha. Não uses o teu nome verdadeiro nem o número de aluno.</p>' : ''}
         </div>
         ${recuperar ? `<div>
@@ -188,28 +188,35 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = [
     definirId(r.user_id, r.utilizador);
     userId = r.user_id;
     const seguir = () => (token ? registar(token) : mostrarEstado());
-    if (r.codigo_recuperacao) mostrarCodigo(r.codigo_recuperacao, seguir, recuperar);
+    if (r.codigo_recuperacao) mostrarCodigo(r.codigo_recuperacao, seguir, recuperar, r.utilizador);
     else seguir();
   });
 }
 
 /** Mostra o código de recuperação (só aparece uma vez). */
-function mostrarCodigo(codigo, seguir, novo = false) {
+function mostrarCodigo(codigo, seguir, novo = false, alcunha = '') {
   const cod = String(codigo).replace(/[^A-Z0-9-]/g, '');
+  const nome = limpaNome(alcunha);
   ecra.innerHTML = `
     <section class="cartao aparecer">
       <h1>${novo ? 'Palavra-passe mudada' : 'Conta criada!'}</h1>
-      <p>Este é o teu ${novo ? '<strong>novo</strong> ' : ''}código de recuperação. Se te esqueceres da palavra-passe,
-        é com ele que voltas a entrar. Tira um print ou copia-o para as tuas notas.</p>
-      <div class="codigo-rec num" id="codigo" aria-label="Código de recuperação">${cod}</div>
+      <p>Guarda estes dois dados: tira um print ou copia-os para as tuas notas.
+        Se te esqueceres da palavra-passe (ou da alcunha), é com o código que voltas a entrar.</p>
+      <p class="etiqueta" style="margin:14px 0 4px">A tua alcunha</p>
+      <div class="codigo-rec" style="margin-top:0;border-style:solid;font-size:1.4rem" id="alcunha">${nome}</div>
+      <p class="etiqueta" style="margin:14px 0 4px">${novo ? 'Novo código' : 'Código'} de recuperação</p>
+      <div class="codigo-rec num" style="margin-top:0" id="codigo" aria-label="Código de recuperação">${cod}</div>
       <div class="pilha" style="margin-top:14px">
-        <button class="btn secundario" type="button" id="copiar">Copiar código</button>
+        <button class="btn secundario" type="button" id="copiar">Copiar alcunha e código</button>
         <button class="btn" type="button" id="guardei">Já guardei, continuar</button>
       </div>
       <p class="muted pequeno" style="margin:12px 0 0">Não o mostramos outra vez. Com a sessão iniciada podes gerar um novo no ecrã do teu progresso.</p>
     </section>`;
   document.getElementById('copiar').addEventListener('click', async (ev) => {
-    try { await navigator.clipboard.writeText(cod); ev.target.textContent = 'Copiado ✓'; } catch { ev.target.textContent = 'Seleciona e copia o código acima'; }
+    try {
+      await navigator.clipboard.writeText(`Sobe+ · alcunha: ${nome} · código de recuperação: ${cod}`);
+      ev.target.textContent = 'Copiado ✓';
+    } catch { ev.target.textContent = 'Seleciona e copia o texto acima'; }
   });
   document.getElementById('guardei').addEventListener('click', seguir);
 }
@@ -386,7 +393,7 @@ async function mostrarEstado() {
     if (!confirm('Gerar um código de recuperação novo? O antigo deixa de funcionar.')) return;
     try {
       const r = await rpc('novo_codigo_recuperacao', { p_user_id: userId });
-      if (r.ok) mostrarCodigo(r.codigo_recuperacao, () => mostrarEstado(), true);
+      if (r.ok) mostrarCodigo(r.codigo_recuperacao, () => mostrarEstado(), true, r.utilizador);
     } catch (e) { console.error(e); alert('Sem ligação ao servidor. Tenta outra vez.'); }
   });
   desenharComum();

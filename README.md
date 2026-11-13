@@ -57,13 +57,14 @@ No primeiro QR, a pessoa escolhe entre duas opções:
 - **Criar conta / entrar:** **nome de utilizador (alcunha) + palavra-passe**, sem email. Entra no teste A/B (sorteio 50/50) e pode continuar o progresso noutro telemóvel. Cada pessoa conta como um só participante.
 - **Continuar sem conta:** fica só com um ID anónimo no telemóvel (variante `G`). As subidas **contam para o total coletivo da UMa**, mas a pessoa não entra na comparação A/B. Depois de uma subida válida vê só "Esta subida conta para o total da UMa", sem números (nem coletivos nem pessoais), para não contaminar o teste se mais tarde criar conta e lhe calhar a versão B. Pode criar conta a qualquer momento.
 
-**Recuperação sem email.** Ao criar a conta, a pessoa recebe um **código de recuperação** (ex.: `3373-6V8A-QGGE`), que aparece uma única vez. Em "Já tenho conta → Esqueci-me da palavra-passe", com a alcunha e o código, escolhe uma palavra-passe nova e recebe um código novo (o antigo deixa de valer). Com a sessão iniciada, também pode gerar um código novo em "Novo código de recuperação".
+**Recuperação sem email.** Ao criar a conta, a pessoa recebe um **código de recuperação** (ex.: `3373-6V8A-QGGE`), que aparece uma única vez. O ecrã mostra também a alcunha, e "Copiar" copia as duas. Em "Já tenho conta → Esqueci-me da palavra-passe", basta o código (a alcunha é opcional: quem a esqueceu fica a sabê-la aqui). A pessoa escolhe uma palavra-passe nova e recebe um código novo (o antigo deixa de valer). Com a sessão iniciada, também pode gerar um código novo em "Novo código de recuperação".
 
 **Alcunhas únicas.** Não há duas contas com a mesma alcunha (`contas.utilizador` é `UNIQUE` e guardado sempre em minúsculas, por isso `Noel` = `noel`). Se a alcunha já existir, a app sugere 3 nomes livres (ex.: `noel.uma`, `noel_22`, `noel81`) para a pessoa tocar e usar.
 
 Segurança:
 
-- Palavras-passe e códigos guardados com bcrypt (`pgcrypto`).
+- Mudar a palavra-passe de uma conta exige sempre o código **dessa** conta. Quem se enganar na alcunha (ex.: escreve `noel` em vez de `noel123`) não consegue mexer na conta do outro.
+- Palavras-passe guardadas com bcrypt. Os códigos de recuperação (12 caracteres aleatórios, cerca de 2^59 combinações) ficam guardados com SHA-256, para se poder encontrar a conta só pelo código.
 - Bloqueio de 15 min após 10 tentativas falhadas por nome (login e recuperação).
 - O painel e o CSV nunca mostram os nomes de utilizador, só pseudónimos (P001, …). Quem não tem conta aparece num cartão à parte e numa coluna própria no CSV diário.
 
