@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/app.css?v=202611201238">
+  <link rel="stylesheet" href="../assets/css/app.css?v=202611201247">
 </head>
 <body>
   <div class="app">
@@ -39,7 +39,7 @@
           <li><strong>Se criares conta</strong>: a alcunha que escolheres, a palavra-passe e o código de recuperação.
             A palavra-passe e o código ficam guardados cifrados, e ninguém os consegue ler, nem nós.</li>
           <li><strong>Preferências</strong>: a meta semanal, se a escolheres.</li>
-          <li><strong>Grupo do estudo</strong>: com conta, ficas num de dois grupos (feedback coletivo ou pessoal).</li>
+          <li><strong>Grupo do estudo</strong>: com ou sem conta, ficas num de dois grupos (feedback coletivo ou pessoal).</li>
         </ul>
         <p style="margin:0"><strong>Não guardamos</strong> nome, email, número de aluno, localização GPS, fotografias nem dados de saúde.
           Escolhe uma alcunha que não te identifique.</p>
@@ -106,8 +106,8 @@
     <div id="rodape"></div>
   </div>
   <script type="module">
-    import { CONFIG } from '../config.js?v=202611201238';
-    import * as ui from '../assets/js/ui.js?v=202611201238';
+    import { CONFIG } from '../config.js?v=202611201247';
+    import * as ui from '../assets/js/ui.js?v=202611201247';
     document.getElementById('topo').innerHTML = ui.cabecalho('../');
     document.getElementById('rodape').innerHTML = ui.rodape('../');
     document.getElementById('ate').textContent = new Date(`${CONFIG.dadosApagadosAte}T12:00:00Z`)

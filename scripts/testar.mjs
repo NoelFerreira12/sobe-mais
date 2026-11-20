@@ -116,7 +116,7 @@ try {
   verificar('Primeiro scan: "inicio"', a.out[0].resultado === 'inicio', a.out[0].resultado);
 
   // ---------- A/B ----------
-  const lista = ids.map(lit).join(',');
+  const lista = [...ids, ...convidados].map(lit).join(','); // sem conta também tem grupo A/B
   const variantes = Object.fromEntries(JSON.parse(sql(`select user_id, variante from public.participantes where user_id in (${lista});`))
     .rows.map((x) => [x.user_id, x.variante]));
   const validas = respostas.filter((x) => x.r.resultado === 'valida');
@@ -142,9 +142,9 @@ try {
   // ---------- Sem conta ----------
   const cv = conv.out[1];
   verificar('Sem conta: subida válida', cv.resultado === 'valida' && cv.conta === false, cv.resultado);
-  verificar('Sem conta: vê o progresso coletivo (como a versão A)', cv.convidado === true && !!cv.coletivo && !cv.pessoal);
   const varConv = JSON.parse(sql(`select variante from public.participantes where user_id = ${lit(conv.id)};`)).rows[0]?.variante;
-  verificar('Sem conta: fica fora do teste A/B (variante G)', varConv === 'G', varConv);
+  verificar('Sem conta: também é sorteado A/B (entra no estudo)', varConv === 'A' || varConv === 'B', varConv);
+  verificar('Sem conta: recebe o ecrã do seu grupo', varConv === 'A' ? !!cv.coletivo && !cv.pessoal : !!cv.pessoal && !cv.coletivo, varConv);
   const col = await rpc('progresso_coletivo');
   verificar('Sem conta: a subida entra no total coletivo', (col.lancos?.['-3'] ?? 0) >= 1, JSON.stringify(col.lancos));
 
@@ -152,9 +152,10 @@ try {
   const nomeEx = `t_${randomUUID().slice(0, 8)}`;
   const contaEx = await rpc('criar_conta', { p_utilizador: nomeEx, p_password: PW_TESTE, p_convidado: conv.id });
   ids.push(contaEx.user_id); nomes.push(nomeEx);
-  const marcas = JSON.parse(sql(`select utilizador, ex_convidado from public.contas where user_id in (${lit(contaEx.user_id)}, ${lit(ids[0])});`)).rows;
-  verificar('Conta criada depois de usar sem conta fica marcada (ex_convidado)',
-    marcas.find((m) => m.utilizador === nomeEx)?.ex_convidado === true && marcas.find((m) => m.utilizador !== nomeEx)?.ex_convidado === false);
+  const depois = JSON.parse(sql(`select p.variante, c.ex_convidado, (select count(*)::int from public.scans s where s.user_id = c.user_id) as n
+    from public.contas c join public.participantes p using (user_id) where c.user_id = ${lit(contaEx.user_id)};`)).rows[0];
+  verificar('Criar conta no mesmo telemóvel mantém o ID, o grupo e o histórico',
+    contaEx.user_id === conv.id && depois?.variante === varConv && depois?.n >= 2 && depois?.ex_convidado === false, JSON.stringify(depois));
 
   // ---------- Perfil completo logo após criar conta ----------
   const idNovo = await novoId();
@@ -165,7 +166,7 @@ try {
   verificar('Perfil segue o grupo (A: coletivo, B: pessoal)', varNovo === 'A' ? !!eNovo.coletivo : !!eNovo.pessoal && !eNovo.coletivo, varNovo);
   verificar('Meta pode ser escolhida antes da 1.ª leitura', (await rpc('definir_meta', { p_user_id: idNovo, p_meta: 2 })).ok === true);
   const eConv = await rpc('estado_utilizador', { p_user_id: randomUUID() });
-  verificar('Sem conta: perfil mostra o coletivo (com histórico da UMa)', !!eConv.coletivo && Array.isArray(eConv.coletivo.dias));
+  verificar('Sem conta, antes da 1.ª leitura: sem números de nenhum grupo', !eConv.coletivo && !eConv.pessoal);
   const eB = await Promise.all(ids.map((id) => rpc('estado_utilizador', { p_user_id: id })));
   verificar('Nenhum perfil B recebe números coletivos', eB.every((e, k) => variantes[ids[k]] !== 'B' || !temChave(e, proibidas)));
 
@@ -257,9 +258,8 @@ try {
     verificar('Painel tem uma linha por ID com leituras no estudo', nossos === esperado, `${nossos} de ${esperado} IDs, ${part} com subida`);
     verificar('Painel não expõe UUIDs', !JSON.stringify(p).match(/[0-9a-f]{8}-[0-9a-f]{4}-/i));
     verificar('Painel tem série diária', Array.isArray(p.diario) && p.diario.length >= 1, JSON.stringify(p.diario));
-    verificar('Painel: linhas sem conta vêm marcadas como G (o cliente tira-as da análise A/B)',
-      p.participantes.some((x) => x.variante === 'G') && p.participantes.every((x) => ['A', 'B', 'G'].includes(x.variante)));
-    verificar('Painel: quem não tem conta aparece à parte', (p.convidados?.subidas ?? 0) >= 1, JSON.stringify(p.convidados));
+    verificar('Painel: cada linha indica se a pessoa tem conta',
+      p.participantes.every((x) => typeof x.tem_conta === 'boolean' && ['A', 'B', 'G'].includes(x.variante)));
   }
 } finally {
   // Cada passo da limpeza é independente: uma falha não impede os outros.

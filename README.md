@@ -37,7 +37,8 @@ O site tem um `manifest.webmanifest`, por isso pode ser instalado no telemóvel 
 
 Quem tem conta fica, **logo ao criar a conta**, num de dois grupos: **A (coletivo)** ou **B (pessoal)**. O grupo nunca muda. Assim, o perfil ("O meu progresso") mostra desde o início a rota do grupo, o histórico dos últimos 14 dias (A: subidas da UMa; B: as próprias subidas), a meta semanal, a sequência e as medalhas. A atribuição é **equilibrada**, para haver tantos dados de um grupo como do outro: cada conta nova vai para o grupo com **menos contas**, e em caso de empate decide-se ao acaso. As atribuições simultâneas são feitas uma de cada vez (advisory lock), por isso os grupos nunca diferem em mais de 1 conta.
 
-Quem usa **sem conta** vê sempre o **coletivo**, mas fica **fora da análise A/B**. Se mais tarde criar conta nesse telemóvel, a conta fica marcada como `ex_convidado`, porque já viu o coletivo. No painel há uma opção para excluir essas contas da análise, e no CSV há as colunas `tem_conta` e `ex_convidado`.
+**Sem conta também entra no estudo (desde 20/11).** Quem usa sem conta é sorteado A ou B na primeira leitura, com o mesmo equilíbrio das contas. Se depois criar conta no mesmo telemóvel, a conta fica com o **mesmo ID, grupo e histórico**. Antes da primeira leitura, quem não tem conta não vê números de nenhum grupo.
+Até 20/11, quem não tinha conta via sempre o coletivo e ficava fora do A/B (variante `G`). Esses IDs continuam fora da análise (cartão "Sem grupo" no painel). Se alguma dessas pessoas criou conta depois, a conta está marcada `ex_convidado`, e há uma opção no painel para a excluir. O CSV tem as colunas `tem_conta` e `ex_convidado`.
 
 A **única** diferença entre A e B é o ecrã que aparece depois de uma subida válida:
 
@@ -59,7 +60,7 @@ O servidor só envia os números coletivos às respostas da versão A. As págin
 No primeiro QR, a pessoa escolhe entre duas opções:
 
 - **Criar conta / entrar:** **nome de utilizador (alcunha) + palavra-passe**, sem email. Entra no teste A/B (sorteio 50/50) e pode continuar o progresso noutro telemóvel. Cada pessoa conta como um só participante.
-- **Continuar sem conta:** fica só com um ID anónimo no telemóvel (variante `G`). As subidas **contam para o total coletivo da UMa** e, depois de uma subida válida, a pessoa vê o progresso coletivo (como a versão A). Não entra na comparação A/B. Pode criar conta a qualquer momento.
+- **Continuar sem conta:** fica só com um ID anónimo no telemóvel. É sorteado A/B na primeira leitura e entra no estudo como qualquer outra pessoa. Só não pode usar o progresso noutro telemóvel nem recuperá-lo. Pode criar conta a qualquer momento sem perder nada.
 
 **Recuperação sem email.** Ao criar a conta, a pessoa recebe um **código de recuperação** (ex.: `3373-6V8A-QGGE`), que aparece uma única vez. O ecrã mostra também a alcunha, e "Copiar" copia as duas. Em "Já tenho conta → Esqueci-me da palavra-passe", basta o código (a alcunha é opcional: quem a esqueceu fica a sabê-la aqui). A pessoa escolhe uma palavra-passe nova e recebe um código novo (o antigo deixa de valer). Com a sessão iniciada, também pode gerar um código novo em "Novo código de recuperação".
 

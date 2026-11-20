@@ -1,4 +1,4 @@
-import { CONFIG } from '../../config.js?v=202611201238';
+import { CONFIG } from '../../config.js?v=202611201247';
 
 // ---------- Metros (sempre recalculados com a altura atual de config.js) ----------
 export function metros(lancos = {}) {

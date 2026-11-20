@@ -1,6 +1,6 @@
-import { CONFIG } from '../../config.js?v=202611201238';
-import { rpc } from './api.js?v=202611201238';
-import * as ui from './ui.js?v=202611201238';
+import { CONFIG } from '../../config.js?v=202611201247';
+import { rpc } from './api.js?v=202611201247';
+import * as ui from './ui.js?v=202611201247';
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
@@ -49,6 +49,9 @@ function mannWhitney(a, b) {
 const f1 = (x, c = 1) => (Number.isFinite(x) ? ui.fmt(x, c) : '—');
 const pct = (x) => (Number.isFinite(x) ? `${ui.fmt(x * 100, 0)}%` : '—');
 const fp = (r) => (r ? (r.p < 0.001 ? 'p < 0,001' : `p = ${ui.fmt(r.p, 3)}`) : 'dados insuficientes');
+
+/** Quantos participantes (com subida) do grupo não têm conta. */
+const semConta = (G) => G.part.filter((l) => l.tem_conta === false).length;
 
 function grupo(linhas, v) {
   const ids = linhas.filter((l) => l.variante === v);
@@ -147,9 +150,9 @@ function mostrarPainel(d) {
     </label>
     <label class="cartao" style="display:flex;gap:12px;align-items:flex-start;padding:14px 18px;cursor:pointer">
       <input type="checkbox" id="sem-ex" ${semEx ? 'checked' : ''} style="width:22px;height:22px;margin-top:2px;accent-color:var(--laranja)">
-      <span><strong>Excluir da análise quem usou sem conta antes de criar conta</strong>
-        <span class="nota" style="display:block">Essas pessoas já tinham visto o progresso coletivo. Ex-convidados com subida:
-          A = ${nEx.A}, B = ${nEx.B}. Quem nunca criou conta fica sempre fora da análise A/B.</span></span>
+      <span><strong>Excluir da análise quem usou sem grupo antes de criar conta</strong>
+        <span class="nota" style="display:block">Pessoas que, até 20/11, usaram o Sobe+ sem conta (sempre com o coletivo) e só depois criaram conta.
+          Com subida: A = ${nEx.A}, B = ${nEx.B}. Desde 20/11, quem não tem conta também é sorteado A/B e entra na análise.</span></span>
     </label>
 
     <div class="grelha">
@@ -161,23 +164,23 @@ function mostrarPainel(d) {
       </section>
       <section class="cartao kpi">
         <div class="rotulo"><i style="background:var(--serie-a);width:10px;height:10px;border-radius:2px;display:inline-block"></i> Versão A · coletivo</div>
-        <div class="valor num">${A.n}</div><div class="nota">${A.ids} IDs com pelo menos 1 leitura</div>
+        <div class="valor num">${A.n}</div><div class="nota">${A.ids} IDs com pelo menos 1 leitura · ${semConta(A)} sem conta</div>
       </section>
       <section class="cartao kpi">
         <div class="rotulo"><i style="background:var(--serie-b);width:10px;height:10px;border-radius:2px;display:inline-block"></i> Versão B · pessoal</div>
-        <div class="valor num">${B.n}</div><div class="nota">${B.ids} IDs com pelo menos 1 leitura</div>
+        <div class="valor num">${B.n}</div><div class="nota">${B.ids} IDs com pelo menos 1 leitura · ${semConta(B)} sem conta</div>
       </section>
       <section class="cartao kpi">
-        <div class="rotulo">Sem conta (fora do teste A/B)</div>
+        <div class="rotulo">Sem grupo (até 20/11, fora do A/B)</div>
         <div class="valor num">${d.convidados?.com_subida ?? 0}</div>
-        <div class="nota">${d.convidados?.ids ?? 0} IDs · ${d.convidados?.subidas ?? 0} subidas válidas, que contam para o total coletivo · ${d.contas ?? 0} contas criadas</div>
+        <div class="nota">${d.convidados?.ids ?? 0} IDs sem conta de antes do sorteio para todos · ${d.convidados?.subidas ?? 0} subidas válidas (contam para o total coletivo) · ${d.contas ?? 0} contas criadas</div>
       </section>
     </div>
 
     <section class="cartao">
       <h2>Comparação A vs B</h2>
       <div class="tabela-scroll"><table>
-        <thead><tr><th>Métrica (participantes com conta)</th><th class="n">A · coletivo</th><th class="n">B · pessoal</th></tr></thead>
+        <thead><tr><th>Métrica (participantes A/B, com ou sem conta)</th><th class="n">A · coletivo</th><th class="n">B · pessoal</th></tr></thead>
         <tbody>
           ${linha('Participantes', A.n, B.n)}
           ${linha('Subidas válidas por semana — média', f1(A.taxaMedia, 2), f1(B.taxaMedia, 2), `Subidas ÷ semanas desde o 1.º scan (mín. 1). Mann–Whitney A&gt;B: ${fp(mwTaxa)}`)}
@@ -207,7 +210,7 @@ function mostrarPainel(d) {
       <div class="grafico" id="grafico">${grafico(d.diario)}<div class="dica" id="dica"></div></div>
       <details style="margin-top:10px"><summary class="ligacao-btn" style="display:inline-block">Ver tabela</summary>
         <div class="tabela-scroll"><table>
-          <thead><tr><th>Dia</th><th class="n">A subidas</th><th class="n">A pessoas</th><th class="n">B subidas</th><th class="n">B pessoas</th><th class="n">Sem conta</th></tr></thead>
+          <thead><tr><th>Dia</th><th class="n">A subidas</th><th class="n">A pessoas</th><th class="n">B subidas</th><th class="n">B pessoas</th><th class="n">Sem grupo</th></tr></thead>
           <tbody>${d.diario.map((x) => `<tr><td>${dataPt(x.dia)}</td><td class="n">${x.A}</td><td class="n">${x.A_pessoas}</td><td class="n">${x.B}</td><td class="n">${x.B_pessoas}</td><td class="n">${x.G ?? 0}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Ainda sem dias de estudo.</td></tr>'}</tbody>
         </table></div>
       </details>
@@ -345,7 +348,7 @@ function csvParticipantes(d) {
   const cab = ['participante', 'variante', 'tem_conta', 'ex_convidado', 'primeiro_dia', 'leituras', 'subidas_validas', 'andares',
     'dias_diferentes', 'subidas_7d', 'repetidas_7d', 'semanas_expostas', 'subidas_por_semana', 'meta_semanal',
     ...Array.from({ length: n }, (_, k) => `semana_${k + 1}`)];
-  const rows = d.participantes.map((l) => [l.id, l.variante, l.variante === 'G' ? 'nao' : 'sim', l.ex_convidado ? 'sim' : 'nao', l.primeiro_dia, l.n_scans, l.subidas, l.andares,
+  const rows = d.participantes.map((l) => [l.id, l.variante, l.tem_conta ? 'sim' : 'nao', l.ex_convidado ? 'sim' : 'nao', l.primeiro_dia, l.n_scans, l.subidas, l.andares,
     l.dias, l.subidas_7d, Math.max(0, l.subidas_7d - 1), l.semanas_expostas,
     (l.subidas / Math.max(1, l.semanas_expostas)).toFixed(3), l.meta_semanal ?? '', ...l.por_semana]);
   return csv([cab, ...rows]);
@@ -370,7 +373,7 @@ function cartaoQualidade(d) {
     <p class="nota" style="margin:0 0 8px">Contas por grupo: <strong>A = ${cA}</strong>, <strong>B = ${cB}</strong>
       ${Math.abs(cA - cB) <= 1 ? '(equilibrado)' : '(desequilibrado: verificar)'} · Contas sem nenhuma leitura: ${q.contas_sem_leituras ?? 0}</p>
     <div class="tabela-scroll"><table>
-      <thead><tr><th>Resultado da leitura</th><th class="n">A</th><th class="n">B</th><th class="n">Sem conta</th></tr></thead>
+      <thead><tr><th>Resultado da leitura</th><th class="n">A</th><th class="n">B</th><th class="n">Sem grupo</th></tr></thead>
       <tbody>${linhas}<tr><td><strong>Total de leituras</strong></td>${['A', 'B', 'G'].map((g) => `<td class="n"><strong>${tot(g)}</strong></td>`).join('')}</tr></tbody>
     </table></div>
     <p class="nota" style="margin:10px 0 0">Muitas leituras "rápido demais" ou "QR lido 2× seguidas" indicam que as regras não estão a ser

@@ -1,9 +1,9 @@
-import { CONFIG } from '../../config.js?v=202611201238';
-import { rpc } from './api.js?v=202611201238';
-import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js?v=202611201238';
-import { resumo, metros, metrosSubida, progressoRota } from './calc.js?v=202611201238';
-import * as ui from './ui.js?v=202611201238';
-import { lerQR } from './leitor.js?v=202611201238';
+import { CONFIG } from '../../config.js?v=202611201247';
+import { rpc } from './api.js?v=202611201247';
+import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js?v=202611201247';
+import { resumo, metros, metrosSubida, progressoRota } from './calc.js?v=202611201247';
+import * as ui from './ui.js?v=202611201247';
+import { lerQR } from './leitor.js?v=202611201247';
 
 const botaoLer = (txt = 'Ler QR do piso', cls = '') =>
   `<button class="btn ${cls}" type="button" data-ler>${ui.ICONES.qr}<span>${txt}</span></button>`;
@@ -146,7 +146,8 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = [
     </section>
     ${recuperar ? '' : `<section class="cartao aparecer aparecer-3" style="margin-top:14px">
       <h2>Sem conta?</h2>
-      <p class="muted" style="margin:0 0 8px">Sobe na mesma: as tuas subidas contam para o total da UMa.</p>
+      <p class="muted" style="margin:0 0 8px">Sobe na mesma, sem conta. Só não dá para usar o teu progresso noutro telemóvel
+        nem recuperá-lo se mudares de telemóvel. Podes criar conta mais tarde e não perdes nada.</p>
       <p class="pequeno" style="margin:0 0 12px"><strong>Registamos um ID anónimo e a hora a que lês os QR, só para contar subidas.</strong>
         <a href="../privacidade/">Privacidade</a></p>
       <button class="btn secundario" type="button" id="sem-conta">Continuar sem conta</button>
@@ -374,7 +375,7 @@ function mostrarResultado(r) {
     <div class="aparecer" style="margin-top:14px">${t.partida
       ? botaoLer('Ler o QR quando chegares')
       : botaoLer('Ler o próximo QR', 'secundario')}</div>
-    ${valida && r.convidado ? cartaoSemConta('A tua subida já conta para o total da UMa.') : ''}
+    ${valida && r.conta === false ? cartaoSemConta('A tua subida já conta.') : ''}
     <div id="perfil" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>`;
   // Depois de uma subida válida, a rota anima desde o valor anterior.
   desenharPerfil(valida ? metrosSubida(r.piso_origem, r.piso) : 0, valida);
@@ -418,7 +419,7 @@ async function mostrarEstado() {
     ${convidado ? '' : `<p class="ola aparecer">Olá, <strong>${nome}</strong></p>`}
     <section class="cartao destaque aparecer">${aviso}</section>
     <div class="aparecer" style="margin-top:14px">${botaoLer()}</div>
-    ${convidado ? cartaoSemConta('As tuas subidas contam para o total da UMa.') : ''}
+    ${convidado ? cartaoSemConta('As tuas subidas contam na mesma.') : ''}
     <div id="perfil" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>
     <p class="muted centro pequeno" style="margin-top:18px">${ui.fraseComparacao(CONFIG)}</p>
     <details class="cartao mais-metas" style="margin-top:14px;padding:14px 20px">
@@ -510,8 +511,8 @@ function mostrarApagar(convidado, erro = '') {
 function cartaoSemConta(frase) {
   return `<section class="cartao aparecer aparecer-2" style="margin-top:14px">
     <h2>Estás sem conta</h2>
-    <p class="muted" style="margin:0 0 12px">${frase} Com uma conta guardas o teu progresso,
-      podes usá-lo noutro telemóvel e entras no estudo.</p>
+    <p class="muted" style="margin:0 0 12px">${frase} Com uma conta (só alcunha e palavra-passe) guardas o teu progresso
+      e podes usá-lo noutro telemóvel. Se a criares neste telemóvel, não perdes nada do que já fizeste.</p>
     <button class="btn secundario" type="button" data-conta>Criar conta ou entrar</button>
   </section>`;
 }
@@ -583,14 +584,18 @@ function cartaoPessoal(pe, estaSubidaM) {
 
 // ---------------------------------------------------------------------
 // Perfil: sempre visível (no ecrã de progresso e depois de cada leitura).
-// Rota e histórico seguem o grupo: A e sem conta -> UMa; B -> pessoal.
+// Rota e histórico seguem o grupo: A -> UMa; B -> pessoal (com ou sem conta).
+// Sem grupo ainda (sem conta, antes da 1.ª leitura): nada do grupo, para não influenciar.
 // ---------------------------------------------------------------------
 function desenharPerfil(estaSubidaM = 0, aposSubida = false, { animado = true } = {}) {
   const alvo = document.getElementById('perfil');
   if (!alvo || !estadoAtual) return;
   const e = estadoAtual;
   let html = '';
-  if (e.coletivo) {
+  if (!e.coletivo && !e.pessoal) {
+    html += `<section class="cartao destaque"><span class="etiqueta">A tua rota pela Madeira</span>
+      <p style="margin:8px 0 0">Aparece depois da tua primeira leitura, com metas como a Fortaleza do Pico e o Cabo Girão.</p></section>`;
+  } else if (e.coletivo) {
     html += cartaoColetivo(e.coletivo, estaSubidaM, aposSubida);
     html += ui.cartaoHistorico(e.coletivo.dias, e.coletivo.hoje || e.hoje, {
       titulo: 'Subidas da UMa', vazio: 'Ainda ninguém subiu nestes dias. Sê o primeiro!' });
