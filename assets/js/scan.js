@@ -1,9 +1,9 @@
-import { CONFIG } from '../../config.js';
-import { rpc } from './api.js';
-import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js';
-import { resumo, metros, metrosSubida, progressoRota } from './calc.js';
-import * as ui from './ui.js';
-import { lerQR } from './leitor.js';
+import { CONFIG } from '../../config.js?v=202611201111';
+import { rpc } from './api.js?v=202611201111';
+import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js?v=202611201111';
+import { resumo, metros, metrosSubida, progressoRota } from './calc.js?v=202611201111';
+import * as ui from './ui.js?v=202611201111';
+import { lerQR } from './leitor.js?v=202611201111';
 
 const botaoLer = (txt = 'Ler QR do piso', cls = '') =>
   `<button class="btn ${cls}" type="button" data-ler>${ui.ICONES.qr}<span>${txt}</span></button>`;
@@ -19,16 +19,18 @@ let userId = null;
 // ---------------------------------------------------------------------
 // Arranque: o token sai logo do URL (recarregar a página não conta como novo scan).
 // ---------------------------------------------------------------------
+let lidoEmPendente = Date.now();
 function tokenDoPedido() {
   const p = new URLSearchParams(location.search).get('p');
   if (p) {
-    try { sessionStorage.setItem(PEND, JSON.stringify({ token: p, t: Date.now() })); } catch { /* */ }
+    lidoEmPendente = Date.now();
+    try { sessionStorage.setItem(PEND, JSON.stringify({ token: p, t: lidoEmPendente })); } catch { /* */ }
     history.replaceState(null, '', location.pathname);
     return p;
   }
   try {
     const pend = JSON.parse(sessionStorage.getItem(PEND) || 'null');
-    if (pend && Date.now() - pend.t < 120000) return pend.token;
+    if (pend && Date.now() - pend.t < 120000) { lidoEmPendente = pend.t; return pend.token; }
   } catch { /* */ }
   return null;
 }
@@ -41,7 +43,7 @@ function arrancar() {
   const token = tokenDoPedido();
   userId = lerId();
   if (token && !userId) return mostrarConta(token);
-  if (token) return registar(token);
+  if (token) return registar(token, lidoEmPendente);
   if (abrirCamara) setTimeout(abrirLeitor, 0);
   if (userId) return mostrarEstado();
   return mostrarConta(null);
@@ -228,14 +230,20 @@ function carregar(txt = 'A registar…') {
   ecra.innerHTML = `<div class="carregar"><div class="roda"></div><span>${txt}</span></div>`;
 }
 
-async function registar(token) {
+// Nas escadas a rede costuma falhar: a leitura fica guardada e é reenviada sozinha
+// quando a ligação voltar, durante no máximo 2 minutos (a hora conta no servidor).
+const VALIDADE_LEITURA_MS = 120000;
+let pararReenvio = () => {};
+
+async function registar(token, lidoEm = Date.now()) {
+  pararReenvio();
   carregar();
   let r;
   try {
     r = await rpc('registar_scan', { p_user_id: userId, p_token: token });
   } catch (e) {
     console.error(e);
-    return mostrarErroRede(token);
+    return mostrarErroRede(token, lidoEm);
   }
   limparPendente();
   if (!r.ok && r.erro === 'sem_conta') {
@@ -247,15 +255,33 @@ async function registar(token) {
   mostrarResultado(r);
 }
 
-function mostrarErroRede(token) {
+function mostrarErroRede(token, lidoEm) {
+  const resta = lidoEm + VALIDADE_LEITURA_MS - Date.now();
+  if (resta <= 0) {
+    limparPendente();
+    ecra.innerHTML = `
+      <section class="cartao resultado aviso aparecer">
+        <div class="icone">${ui.ICONES.info}</div>
+        <h1>Sem ligação</h1>
+        <p>Passou demasiado tempo sem internet e esta leitura já não conta. Quando tiveres rede, lê o QR outra vez.</p>
+        ${botaoLer('Ler QR outra vez')}
+      </section>`;
+    return;
+  }
   ecra.innerHTML = `
     <section class="cartao resultado aviso aparecer">
       <div class="icone">${ui.ICONES.info}</div>
       <h1>Sem ligação</h1>
-      <p>Não conseguimos registar a leitura. Verifica a internet e tenta outra vez.</p>
-      <button class="btn" id="repetir">Tentar outra vez</button>
+      <p>A leitura está guardada. Enviamo-la sozinhos assim que a internet voltar, não precisas de fazer nada.</p>
+      <p class="muted pequeno" style="margin:0 0 12px">A tentar de novo durante mais ${Math.ceil(resta / 1000)} s.</p>
+      <button class="btn" id="repetir">Tentar agora</button>
     </section>`;
-  document.getElementById('repetir').addEventListener('click', () => registar(token));
+  const tentar = () => registar(token, lidoEm);
+  document.getElementById('repetir').addEventListener('click', tentar);
+  const aoVoltar = () => tentar();
+  addEventListener('online', aoVoltar, { once: true });
+  const temporizador = setTimeout(tentar, Math.min(6000, resta));
+  pararReenvio = () => { removeEventListener('online', aoVoltar); clearTimeout(temporizador); pararReenvio = () => {}; };
 }
 
 const ERROS = {
@@ -390,11 +416,19 @@ async function mostrarEstado() {
       <div class="pilha" style="margin-top:12px">
         ${convidado ? '' : `<button class="btn secundario pequeno" type="button" id="novo-codigo">Novo código de recuperação</button>
         <button class="btn secundario pequeno" type="button" id="sair">Terminar sessão</button>`}
+        ${pedidoInstalar ? '<button class="btn secundario pequeno" type="button" id="instalar">Instalar a app no telemóvel</button>' : ''}
+        <button class="btn secundario pequeno" type="button" id="descarregar">Descarregar os meus dados</button>
         <button class="btn secundario pequeno" type="button" id="apagar" style="color:#B3261E">${convidado ? 'Apagar os meus dados' : 'Apagar a minha conta e dados'}</button>
         <p class="muted pequeno" style="margin:0"><a href="../privacidade/">Privacidade</a> · <a href="../termos/">Termos</a></p>
       </div>
     </details>`;
   document.getElementById('apagar').addEventListener('click', () => mostrarApagar(convidado));
+  document.getElementById('descarregar').addEventListener('click', descarregarDados);
+  document.getElementById('instalar')?.addEventListener('click', async (ev) => {
+    const pedido = pedidoInstalar; pedidoInstalar = null;
+    ev.currentTarget.remove();
+    try { await pedido?.prompt(); } catch { /* o utilizador fechou */ }
+  });
   document.getElementById('sair')?.addEventListener('click', () => {
     esquecerId(); userId = null; estadoAtual = null; mostrarConta(null, 'entrar');
   });
@@ -407,6 +441,26 @@ async function mostrarEstado() {
   });
   desenharPerfil();
 }
+
+/** Direito de acesso/portabilidade (RGPD): ficheiro JSON com os dados desta pessoa. */
+async function descarregarDados(ev) {
+  const b = ev.currentTarget;
+  b.disabled = true;
+  try {
+    const r = await rpc('meus_dados', { p_user_id: userId });
+    if (!r.ok) throw new Error(r.erro);
+    const url = URL.createObjectURL(new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: 'sobe-os-meus-dados.json' });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    console.error(e); alert('Não foi possível descarregar os dados. Tenta outra vez.');
+  } finally { b.disabled = false; }
+}
+
+// Android/Chrome: guarda o pedido de instalação para mostrar o botão "Instalar a app".
+let pedidoInstalar = null;
+addEventListener('beforeinstallprompt', (ev) => { ev.preventDefault(); pedidoInstalar = ev; });
 
 /** Direito ao apagamento: apaga conta, participante e todas as leituras. */
 function mostrarApagar(convidado, erro = '') {

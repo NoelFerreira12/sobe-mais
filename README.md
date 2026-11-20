@@ -146,7 +146,21 @@ npm install
 npm run servir        # http://localhost:8080
 npm run testar        # testa o fluxo completo contra o Supabase real (~3,5 min) e apaga os IDs de teste
 npm run password      # gera uma nova password do painel (guardada em .env)
+npm run backup        # cópia de segurança local da BD em backups/ (fora do git)
+npm run versao        # marca os .js/.css com uma versão nova: corre SEMPRE antes de publicar alterações ao site
 ```
+
+**Antes de publicar uma alteração ao site**, corre `npm run versao`. O GitHub Pages guarda os ficheiros em cache 10 minutos. Com uma versão nova em todos os `import` e `<script>`, nenhum telemóvel mistura código antigo com novo.
+
+**Backups.** O plano Free do Supabase não faz cópias de segurança. Corre `npm run backup` uma vez por semana e no fim do estudo (8 dez). Em alternativa, descarrega os três CSV do painel.
+
+### Outras funcionalidades
+
+- **Sem rede nas escadas:** a leitura fica guardada e é enviada sozinha quando a ligação voltar, durante no máximo 2 minutos. A hora que conta continua a ser a do servidor.
+- **Painel → Qualidade dos dados:** mostra os resultados das leituras por grupo (válidas, inícios, descidas, rápidas, intervalo de 5 min, repetidas) e quantas contas há em cada grupo. Serve para ver se as regras estão a ser percebidas.
+- **Painel → CSV de leituras:** uma linha por QR lido (data, hora, pisos, resultado, segundos), com os mesmos pseudónimos dos outros CSV.
+- **Perfil → Descarregar os meus dados:** um ficheiro JSON com a conta, o grupo e as leituras da pessoa (direito de acesso do RGPD).
+- **Perfil → Instalar a app:** aparece no Android/Chrome quando o browser permite instalar.
 
 Os scripts de administração usam o Supabase CLI (`supabase login` + `supabase link --project-ref <ref>`).
 

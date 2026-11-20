@@ -2,7 +2,22 @@
 // que são apagados no fim. Demora ~3,5 min (os tempos são reais, medidos pelo servidor).
 //   --painel  também testa o painel (põe o início do estudo em "hoje" durante o teste e repõe no fim)
 import { randomUUID } from 'node:crypto';
-import { CONFIG, env, rpc, sql, esperar, lit } from './lib.mjs';
+import { writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { CONFIG, RAIZ, env, rpc, sql, esperar, lit } from './lib.mjs';
+
+// Se o teste for interrompido (falha de rede, Ctrl+C…), os IDs de teste ficam em
+// testes.local.json para `npm run limpar-testes` os apagar depois.
+const PENDENTES = join(RAIZ, 'testes.local.json');
+let limpo = false;
+process.on('SIGINT', () => process.exit(130));
+process.on('exit', () => {
+  try {
+    if (limpo || (!ids.length && !convidados.length)) return;
+    writeFileSync(PENDENTES, JSON.stringify({ ids, convidados, inicio: CONFIG.estudo.inicio }, null, 2));
+    console.error(`\n⚠ Limpeza incompleta. Corre: npm run limpar-testes  (IDs guardados em ${PENDENTES})`);
+  } catch { /* ainda não havia IDs de teste */ }
+});
 
 const comPainel = process.argv.includes('--painel');
 const password = env('PAINEL_PASSWORD');
@@ -237,19 +252,28 @@ try {
     verificar('Painel: quem não tem conta aparece à parte', (p.convidados?.subidas ?? 0) >= 1, JSON.stringify(p.convidados));
   }
 } finally {
+  // Cada passo da limpeza é independente: uma falha não impede os outros.
+  let ok = true;
   if (inicioOriginal) {
-    sql(`update public.config set valor = ${lit(inicioOriginal)} where chave = 'estudo_inicio';`);
-    console.log(`(estudo_inicio reposto = ${inicioOriginal})`);
+    try {
+      sql(`update public.config set valor = ${lit(inicioOriginal)} where chave = 'estudo_inicio';`);
+      console.log(`(estudo_inicio reposto = ${inicioOriginal})`);
+    } catch (e) { ok = false; console.error('Falhou repor estudo_inicio:', e.message.split('\n')[0]); }
   }
-  if (ids.length) {
-    const todos = [...ids, ...convidados].map(lit).join(',');
-    sql(`delete from public.participantes where user_id in (${todos});
-         delete from public.contas where user_id in (${ids.map(lit).join(',')});
-         delete from public.login_tentativas where utilizador like 't\\_%' or utilizador in ('nome com espaços!', '*codigo*');
-         delete from public.painel_tentativas;`);
-    const resto = JSON.parse(sql(`select count(*)::int as n from public.scans where user_id in (${ids.map(lit).join(',')});`)).rows[0].n;
-    console.log(`IDs de teste apagados (${ids.length}); scans restantes desses IDs: ${resto}`);
+  if (ids.length || convidados.length) {
+    try {
+      const todos = [...ids, ...convidados].map(lit).join(',');
+      sql(`delete from public.participantes where user_id in (${todos});
+           delete from public.contas where user_id in (${ids.length ? ids.map(lit).join(',') : 'null'});
+           delete from public.login_tentativas where utilizador like 't\\_%' or utilizador in ('nome com espaços!', '*codigo*');
+           delete from public.painel_tentativas;`);
+      const resto = JSON.parse(sql(`select count(*)::int as n from public.scans where user_id in (${todos});`)).rows[0].n;
+      console.log(`IDs de teste apagados (${ids.length + convidados.length}); scans restantes desses IDs: ${resto}`);
+      if (resto) ok = false;
+    } catch (e) { ok = false; console.error('Falhou apagar os IDs de teste:', e.message.split('\n')[0]); }
   }
+  limpo = ok;
+  if (ok) rmSync(PENDENTES, { force: true });
 }
 
 for (const r of resultados) console.log(`${r.ok ? '✔' : '✘'} ${r.nome}${r.detalhe ? `  [${r.detalhe}]` : ''}`);

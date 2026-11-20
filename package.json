@@ -9,6 +9,9 @@
     "testar": "node scripts/testar.mjs --painel",
     "password": "node scripts/admin.mjs password",
     "config:sync": "node scripts/admin.mjs config:sync",
+    "backup": "node scripts/backup.mjs",
+    "limpar-testes": "node scripts/admin.mjs limpar-testes",
+    "versao": "node scripts/versao.mjs",
     "servir": "npx --yes http-server -p 8080 -c-1 ."
   },
   "devDependencies": {

@@ -37,14 +37,24 @@ export async function rpc(nome, params = {}) {
   return JSON.parse(txt);
 }
 
-/** Corre SQL na base de dados remota através do Supabase CLI (precisa de `supabase login` + `supabase link`). */
-export function sql(consulta) {
+/**
+ * Corre SQL na base de dados remota através do Supabase CLI (precisa de `supabase login` + `supabase link`).
+ * Tenta até 3 vezes: a API do Supabase às vezes falha por momentos ("Transport error").
+ */
+export function sql(consulta, tentativas = 3) {
   const dir = mkdtempSync(join(tmpdir(), 'sobe-'));
   const f = join(dir, 'q.sql');
   writeFileSync(f, consulta);
   try {
-    return execFileSync('supabase', ['db', 'query', '--remote', '--yes', '-f', f, '-o', 'json'],
-      { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    for (let i = 1; ; i++) {
+      try {
+        return execFileSync('supabase', ['db', 'query', '--remote', '--yes', '-f', f, '-o', 'json'],
+          { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      } catch (e) {
+        if (i >= tentativas) throw e;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2000 * i); // espera 2 s, 4 s…
+      }
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

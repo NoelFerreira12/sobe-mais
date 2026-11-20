@@ -4,6 +4,8 @@ node_modules/
 *.local.*
 # QR codes contêm os tokens secretos dos pisos: gera-os localmente com `npm run qr`
 qrcodes/
+# Backups locais (contêm IDs e tokens): npm run backup
+backups/
 supabase/.temp/
 supabase/.branches/
 .DS_Store

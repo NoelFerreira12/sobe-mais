@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/app.css">
+  <link rel="stylesheet" href="../assets/css/app.css?v=202611201111">
 </head>
 <body>
   <div class="app">
@@ -89,7 +89,8 @@
         <h2>Os teus direitos</h2>
         <p>Tens direito a aceder aos teus dados, a corrigi-los, a apagá-los e a retirar o consentimento.</p>
         <ul>
-          <li><strong>Ver os teus dados</strong>: o ecrã "O meu progresso" mostra tudo o que está associado ao teu ID.</li>
+          <li><strong>Ver e levar os teus dados</strong>: em "O meu progresso", carrega em <em>Descarregar os meus dados</em>
+            para receberes um ficheiro com tudo o que está associado ao teu ID.</li>
           <li><strong>Apagar tudo</strong>: em "O meu progresso", carrega em <em>Apagar a minha conta e dados</em>.
             Apagamos a conta e todas as leituras, que deixam também de contar para o total da UMa.</li>
         </ul>
@@ -105,8 +106,8 @@
     <div id="rodape"></div>
   </div>
   <script type="module">
-    import { CONFIG } from '../config.js';
-    import * as ui from '../assets/js/ui.js';
+    import { CONFIG } from '../config.js?v=202611201111';
+    import * as ui from '../assets/js/ui.js?v=202611201111';
     document.getElementById('topo').innerHTML = ui.cabecalho('../');
     document.getElementById('rodape').innerHTML = ui.rodape('../');
     document.getElementById('ate').textContent = new Date(`${CONFIG.dadosApagadosAte}T12:00:00Z`)

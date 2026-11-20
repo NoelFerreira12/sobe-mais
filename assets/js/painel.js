@@ -1,6 +1,6 @@
-import { CONFIG } from '../../config.js';
-import { rpc } from './api.js';
-import * as ui from './ui.js';
+import { CONFIG } from '../../config.js?v=202611201111';
+import { rpc } from './api.js?v=202611201111';
+import * as ui from './ui.js?v=202611201111';
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
@@ -213,13 +213,18 @@ function mostrarPainel(d) {
       </details>
     </section>
 
+    ${cartaoQualidade(d)}
+
     <section class="cartao">
       <h2>Exportar (CSV anónimo)</h2>
-      <p class="muted">Sem IDs reais: cada participante tem um pseudónimo (P001, P002, …).</p>
+      <p class="muted">Sem IDs reais: cada participante tem um pseudónimo (P001, P002, …), igual nos três ficheiros.</p>
       <div class="botoes">
         <button class="btn pequeno" id="csv-part">CSV por participante</button>
         <button class="btn pequeno" id="csv-dia">CSV por dia</button>
+        <button class="btn pequeno" id="csv-leituras">CSV de leituras</button>
       </div>
+      <p class="nota" style="margin:10px 0 0">O CSV de leituras tem uma linha por QR lido (data, hora, pisos, resultado, segundos).
+        Serve para análises por hora do dia ou por tempo de subida, e também como cópia de segurança dos dados.</p>
     </section>
 
     <p class="nota centro">Regras: ${d.regras.min_seg_por_andar}–${d.regras.max_seg_por_andar} s por andar ·
@@ -230,6 +235,20 @@ function mostrarPainel(d) {
   const suf = d.inclui_fora ? '-com-testes' : '';
   document.getElementById('csv-part').onclick = () => descarregar(`sobe-participantes${suf}.csv`, csvParticipantes(d));
   document.getElementById('csv-dia').onclick = () => descarregar(`sobe-diario${suf}.csv`, csvDiario(d));
+  document.getElementById('csv-leituras').onclick = async (ev) => {
+    const b = ev.currentTarget;
+    b.disabled = true; b.textContent = 'A preparar…';
+    try {
+      const r = await rpc('painel_leituras', { p_password: sessionStorage.getItem(CHAVE) || '', p_incluir_fora: d.inclui_fora });
+      if (!r.ok) throw new Error(r.erro);
+      descarregar(`sobe-leituras${suf}.csv`, csv([
+        ['participante', 'variante', 'data', 'hora', 'piso_origem', 'piso', 'resultado', 'segundos', 'andares', 'no_estudo'],
+        ...r.leituras.map((x) => [x.participante, x.variante, x.data, x.hora, x.piso_origem, x.piso, x.resultado,
+          x.segundos, x.andares, x.no_estudo ? 'sim' : 'nao'])]));
+    } catch (e) {
+      console.error(e); alert('Não foi possível exportar as leituras. Tenta outra vez.');
+    } finally { b.disabled = false; b.textContent = 'CSV de leituras'; }
+  };
   document.getElementById('sem-ex').onchange = (ev) => {
     try { sessionStorage.setItem(CHAVE_EX, ev.target.checked ? '1' : '0'); } catch { /* */ }
     mostrarPainel(dados);
@@ -331,6 +350,34 @@ function csvParticipantes(d) {
     (l.subidas / Math.max(1, l.semanas_expostas)).toFixed(3), l.meta_semanal ?? '', ...l.por_semana]);
   return csv([cab, ...rows]);
 }
+/** Qualidade dos dados: ajuda a perceber se as pessoas estão a perceber as regras. */
+function cartaoQualidade(d) {
+  const q = d.qualidade;
+  if (!q) return '';
+  const tipos = [
+    ['valida', 'Subida válida'], ['inicio', 'Início de subida'], ['descer', 'Desceu (novo início)'],
+    ['rapido', 'Rápido demais'], ['lento', 'Passou muito tempo'], ['cooldown', 'Intervalo de 5 min'],
+    ['repetido', 'QR lido 2× seguidas'],
+  ];
+  const col = (g, t) => q.resultados?.[g]?.[t] ?? 0;
+  const tot = (g) => tipos.reduce((s, [t]) => s + col(g, t), 0);
+  const pct = (g, t) => (tot(g) ? ` <span class="nota">(${Math.round((col(g, t) / tot(g)) * 100)}%)</span>` : '');
+  const linhas = tipos.map(([t, rot]) => `<tr><td>${rot}</td>${['A', 'B', 'G'].map((g) =>
+    `<td class="n">${col(g, t)}${pct(g, t)}</td>`).join('')}</tr>`).join('');
+  const cA = q.contas_por_grupo?.A ?? 0, cB = q.contas_por_grupo?.B ?? 0;
+  return `<section class="cartao">
+    <h2>Qualidade dos dados</h2>
+    <p class="nota" style="margin:0 0 8px">Contas por grupo: <strong>A = ${cA}</strong>, <strong>B = ${cB}</strong>
+      ${Math.abs(cA - cB) <= 1 ? '(equilibrado)' : '(desequilibrado: verificar)'} · Contas sem nenhuma leitura: ${q.contas_sem_leituras ?? 0}</p>
+    <div class="tabela-scroll"><table>
+      <thead><tr><th>Resultado da leitura</th><th class="n">A</th><th class="n">B</th><th class="n">Sem conta</th></tr></thead>
+      <tbody>${linhas}<tr><td><strong>Total de leituras</strong></td>${['A', 'B', 'G'].map((g) => `<td class="n"><strong>${tot(g)}</strong></td>`).join('')}</tr></tbody>
+    </table></div>
+    <p class="nota" style="margin:10px 0 0">Muitas leituras "rápido demais" ou "QR lido 2× seguidas" indicam que as regras não estão a ser
+      percebidas (ou tentativas de batota). As leituras "Desceu" e "Passou muito tempo" contam como novos inícios.</p>
+  </section>`;
+}
+
 function csvDiario(d) {
   return csv([['dia', 'A_subidas', 'A_pessoas', 'B_subidas', 'B_pessoas', 'sem_conta_subidas', 'sem_conta_pessoas'],
     ...d.diario.map((x) => [x.dia, x.A, x.A_pessoas, x.B, x.B_pessoas, x.G ?? 0, x.G_pessoas ?? 0])]);
