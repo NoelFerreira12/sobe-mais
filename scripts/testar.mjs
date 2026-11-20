@@ -131,6 +131,19 @@ try {
   verificar('Conta criada depois de usar sem conta fica marcada (ex_convidado)',
     marcas.find((m) => m.utilizador === nomeEx)?.ex_convidado === true && marcas.find((m) => m.utilizador !== nomeEx)?.ex_convidado === false);
 
+  // ---------- Perfil completo logo após criar conta ----------
+  const idNovo = await novoId();
+  const eNovo = await rpc('estado_utilizador', { p_user_id: idNovo });
+  verificar('Conta nova já tem grupo e perfil (sem ler QR)', eNovo.existe === true && (!!eNovo.coletivo !== !!eNovo.pessoal),
+    `coletivo=${!!eNovo.coletivo} pessoal=${!!eNovo.pessoal}`);
+  const varNovo = JSON.parse(sql(`select variante from public.participantes where user_id = ${lit(idNovo)};`)).rows[0]?.variante;
+  verificar('Perfil segue o grupo (A: coletivo, B: pessoal)', varNovo === 'A' ? !!eNovo.coletivo : !!eNovo.pessoal && !eNovo.coletivo, varNovo);
+  verificar('Meta pode ser escolhida antes da 1.ª leitura', (await rpc('definir_meta', { p_user_id: idNovo, p_meta: 2 })).ok === true);
+  const eConv = await rpc('estado_utilizador', { p_user_id: randomUUID() });
+  verificar('Sem conta: perfil mostra o coletivo (com histórico da UMa)', !!eConv.coletivo && Array.isArray(eConv.coletivo.dias));
+  const eB = await Promise.all(ids.map((id) => rpc('estado_utilizador', { p_user_id: id })));
+  verificar('Nenhum perfil B recebe números coletivos', eB.every((e, k) => variantes[ids[k]] !== 'B' || !temChave(e, proibidas)));
+
   // ---------- Apagar dados (RGPD) ----------
   const idApagar = await novoId();
   await rpc('registar_scan', { p_user_id: idApagar, p_token: tok[2] });

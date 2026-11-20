@@ -275,41 +275,52 @@ function mostrarErro(codigo) {
     <p class="centro" style="margin-top:16px"><a href="./">Ver o meu progresso</a></p>`;
 }
 
+const TOPO = Math.max(...CONFIG.pisos);
+
+/**
+ * Texto de cada resultado. Todas as leituras que não são uma subida válida
+ * deixam esse piso como novo ponto de partida, e o ecrã di-lo claramente.
+ */
 function textoResultado(r) {
   const P = ui.nomePiso;
+  const noTopo = r.piso === TOPO;
+  const topo = (extra) => ({ cls: '', icone: 'bandeira', titulo: `Estás no topo, ${P(r.piso)}!`,
+    texto: 'Para a próxima subida, lê o QR do piso onde começares.', extra });
+  const comeco = (extra) => (noTopo ? topo(extra) : { cls: '', icone: 'subir', partida: true,
+    titulo: `Começaste no ${P(r.piso)}!`, texto: 'Sobe e lê o QR quando chegares.', extra });
   switch (r.resultado) {
     case 'inicio':
-      if (r.piso === Math.max(...CONFIG.pisos)) {
-        return { cls: '', icone: 'bandeira', titulo: `Estás no topo, ${P(r.piso)}!`,
-          texto: 'Para a próxima subida, lê o QR do piso onde começares.' };
-      }
-      return { cls: '', icone: 'subir', titulo: `Começaste no ${P(r.piso)}!`,
-        texto: 'Sobe e lê o QR quando chegares.',
-        extra: 'Ao teu ritmo: não há pressa nenhuma.' };
+      return comeco('Ao teu ritmo: não há pressa nenhuma.');
+    case 'descer':
+      return comeco(`Descer não conta, mas boa caminhada! A leitura anterior (${P(r.piso_origem)}) ficou sem subida.`);
+    case 'lento':
+      return comeco(`Passou muito tempo desde a leitura no ${P(r.piso_origem)}, por isso começas outra vez a partir deste piso.`);
     case 'valida':
       return { cls: 'ok', icone: 'check', titulo: 'Subida registada!',
         grande: `+${r.andares} ${r.andares === 1 ? 'andar' : 'andares'}`,
         texto: `Do ${P(r.piso_origem)} ao ${P(r.piso)}.` };
     case 'rapido':
-      return { cls: 'aviso', icone: 'relogio', titulo: 'Foste rápido demais',
+      return { cls: 'aviso', icone: 'relogio', titulo: 'Foste rápido demais', partida: !noTopo,
         texto: `Para contar, ${r.andares} ${r.andares === 1 ? 'andar tem' : 'andares têm'} de demorar pelo menos ${ui.duracao(r.min_seg)}. Sobe com calma, ao teu ritmo.`,
-        extra: `O ${P(r.piso)} fica como ponto de partida.` };
-    case 'lento':
-      return { cls: 'aviso', icone: 'relogio', titulo: 'Passou muito tempo',
-        texto: 'Começa outra vez a partir deste piso.',
-        extra: `O ${P(r.piso)} já conta como novo ponto de partida.` };
-    case 'descer':
-      return { cls: '', icone: 'descer', titulo: 'Descer não conta, mas boa caminhada!',
-        texto: `O ${P(r.piso)} fica como ponto de partida para a próxima subida.` };
+        extra: noTopo ? 'Para a próxima subida, lê o QR do piso onde começares.'
+          : `Começas outra vez a partir do ${P(r.piso)}: sobe e lê o QR quando chegares.` };
     case 'cooldown': {
       const min = Math.max(1, Math.ceil((r.cooldown_restante_seg ?? 60) / 60));
-      return { cls: 'aviso', icone: 'pausa', titulo: 'Já contámos uma subida há pouco',
-        texto: `Volta daqui a uns minutos (cerca de ${min} min).`,
-        extra: `O ${P(r.piso)} fica como ponto de partida.` };
+      return { cls: 'aviso', icone: 'pausa', titulo: 'Já contámos uma subida há pouco', partida: !noTopo,
+        texto: `As subidas voltam a contar daqui a cerca de ${min} min.`,
+        extra: noTopo ? '' : `O ${P(r.piso)} fica como ponto de partida.` };
     }
-    case 'repetido':
-      return { cls: '', icone: 'repetir', titulo: 'Este QR já foi lido agora mesmo',
-        texto: 'Não precisas de o ler outra vez.' };
+    case 'repetido': {
+      const u = r.estado?.ultimo_scan;
+      if (u && u.resultado === 'valida' && u.piso === r.piso) {
+        return { cls: 'ok', icone: 'check', titulo: 'Esta subida já está registada', partida: !noTopo,
+          texto: noTopo ? 'Chegaste ao topo. Para a próxima subida, lê o QR do piso onde começares.'
+            : `Chegaste ao ${P(r.piso)}. Se continuares a subir, este piso é o ponto de partida.` };
+      }
+      if (noTopo) return topo('Este QR já tinha sido lido agora mesmo.');
+      return { cls: '', icone: 'subir', partida: true, titulo: `Já estás a começar no ${P(r.piso)}`,
+        texto: 'Este QR já tinha sido lido agora mesmo. Sobe e lê o QR quando chegares.' };
+    }
     default:
       return { cls: 'aviso', icone: 'info', titulo: 'Leitura registada', texto: '' };
   }
@@ -317,21 +328,7 @@ function textoResultado(r) {
 
 function mostrarResultado(r) {
   const t = textoResultado(r);
-  let variante = '';
-  if (r.resultado === 'valida') {
-    // A ÚNICA diferença entre versões. O servidor só envia "coletivo" à versão A
-    // e "pessoal" à versão B.
-    const estaSubida = metrosSubida(r.piso_origem, r.piso);
-    // Sem conta (convidado) vê sempre o coletivo, como a versão A.
-    if (r.coletivo) variante = cartaoColetivo(r.coletivo, estaSubida);
-    else if (r.pessoal) variante = cartaoPessoal(r.pessoal, estaSubida);
-    if (r.convidado) variante += `<section class="cartao" style="margin-top:14px">
-      <h2 style="margin:0 0 6px">Estás sem conta</h2>
-      <p class="muted" style="margin:0 0 12px">A tua subida já conta para o total da UMa. Cria uma conta para guardares
-        o teu progresso, usares outro telemóvel e entrares no estudo.</p>
-      <button class="btn secundario" type="button" data-conta>Criar conta ou entrar</button>
-    </section>`;
-  }
+  const valida = r.resultado === 'valida';
   ecra.innerHTML = `
     <section class="cartao resultado ${t.cls} aparecer">
       <div class="icone">${ui.ICONES[t.icone]}</div>
@@ -340,17 +337,17 @@ function mostrarResultado(r) {
       ${t.texto ? `<p>${t.texto}</p>` : ''}
       ${t.extra ? `<p class="pequeno" style="margin:0">${t.extra}</p>` : ''}
     </section>
-    <div class="aparecer" style="margin-top:14px">${r.resultado === 'inicio' && t.icone !== 'bandeira'
+    <div class="aparecer" style="margin-top:14px">${t.partida
       ? botaoLer('Ler o QR quando chegares')
       : botaoLer('Ler o próximo QR', 'secundario')}</div>
-    ${variante ? `<div class="aparecer aparecer-2" style="margin-top:14px">${variante}</div>` : ''}
-    <div id="comum" class="pilha aparecer aparecer-3" style="margin-top:14px"></div>`;
-  desenharComum();
-  animar();
-  if (r.resultado === 'valida') {
+    ${valida && r.convidado ? cartaoSemConta('A tua subida já conta para o total da UMa.') : ''}
+    <div id="perfil" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>`;
+  // Depois de uma subida válida, a rota anima desde o valor anterior.
+  desenharPerfil(valida ? metrosSubida(r.piso_origem, r.piso) : 0, valida);
+  if (valida) {
     ui.vibrar();
     setTimeout(ui.confettis, 250);
-  } else if (r.resultado === 'inicio') {
+  } else if (t.partida) {
     ui.vibrar(25);
   }
 }
@@ -372,19 +369,21 @@ async function mostrarEstado() {
     return mostrarConta(null, 'entrar', 'A tua sessão terminou. Entra outra vez.');
   }
   const u = estadoAtual.ultimo_scan;
-  const maxTopo = Math.max(...CONFIG.pisos);
-  const emCurso = u && u.piso < maxTopo &&
-    u.segundos_desde <= CONFIG.maxSegPorAndar * (maxTopo - u.piso);
+  const janela = estadoAtual.janela_seg ?? CONFIG.maxSegPorAndar * (TOPO - Math.min(...CONFIG.pisos));
+  const emCurso = u && u.piso < TOPO && u.segundos_desde <= janela;
   const aviso = emCurso
-    ? `<h2>Estás a meio de uma subida</h2><p style="margin:0">Começaste no ${ui.nomePiso(u.piso)} há ${ui.duracao(u.segundos_desde)}. Sobe e lê o QR quando chegares.</p>`
+    ? `<span class="etiqueta">Ponto de partida</span>
+       <h2 style="margin:6px 0">${ui.nomePiso(u.piso)}</h2>
+       <p style="margin:0">Leste este QR há ${ui.duracao(u.segundos_desde)}. Sobe e lê o QR quando chegares.</p>
+       <p class="muted pequeno" style="margin:6px 0 0">Mudaste de ideias? Não faz mal: lê o QR do piso onde estiveres e começas uma subida nova.</p>`
     : `<h2>Pronto para subir?</h2><p style="margin:0">Lê o QR do piso onde estás para começar uma subida.</p>`;
   const nome = limpaNome(estadoAtual.utilizador);
   ecra.innerHTML = `
     ${convidado ? '' : `<p class="ola aparecer">Olá, <strong>${nome}</strong></p>`}
     <section class="cartao destaque aparecer">${aviso}</section>
     <div class="aparecer" style="margin-top:14px">${botaoLer()}</div>
-    ${convidado ? cartaoSemConta() : ''}
-    <div id="comum" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>
+    ${convidado ? cartaoSemConta('As tuas subidas contam para o total da UMa.') : ''}
+    <div id="perfil" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>
     <p class="muted centro pequeno" style="margin-top:18px">${ui.fraseComparacao(CONFIG)}</p>
     <details class="cartao mais-metas" style="margin-top:14px;padding:14px 20px">
       <summary><span>${convidado ? 'Os meus dados' : 'A minha conta'}</span></summary>
@@ -406,7 +405,7 @@ async function mostrarEstado() {
       if (r.ok) mostrarCodigo(r.codigo_recuperacao, () => mostrarEstado(), true, r.utilizador);
     } catch (e) { console.error(e); alert('Sem ligação ao servidor. Tenta outra vez.'); }
   });
-  desenharComum();
+  desenharPerfil();
 }
 
 /** Direito ao apagamento: apaga conta, participante e todas as leituras. */
@@ -444,11 +443,11 @@ function mostrarApagar(convidado, erro = '') {
 }
 
 /** Convite para criar conta (só para quem está sem conta). */
-function cartaoSemConta() {
+function cartaoSemConta(frase) {
   return `<section class="cartao aparecer aparecer-2" style="margin-top:14px">
     <h2>Estás sem conta</h2>
-    <p class="muted" style="margin:0 0 12px">As tuas subidas contam para o total da UMa. Com uma conta guardas o teu
-      progresso, podes usá-lo noutro telemóvel e entras no estudo.</p>
+    <p class="muted" style="margin:0 0 12px">${frase} Com uma conta guardas o teu progresso,
+      podes usá-lo noutro telemóvel e entras no estudo.</p>
     <button class="btn secundario" type="button" data-conta>Criar conta ou entrar</button>
   </section>`;
 }
@@ -493,10 +492,11 @@ function blocoRota(rota, total, estaSubidaM, { sujeito, chegou, extra = '' }) {
     </details>`;
 }
 
-// Versão A — objetivo GLOBAL: os metros de toda a UMa.
-function cartaoColetivo(c, estaSubidaM) {
+// Versão A (e sem conta) — objetivo GLOBAL: os metros de toda a UMa.
+function cartaoColetivo(c, estaSubidaM, aposSubida) {
   const total = metros(c.lancos);
-  const extra = `<p class="muted pequeno" style="margin:0">A tua subida juntou-se a ${ui.fmt(c.subidas)} ${c.subidas === 1 ? 'subida' : 'subidas'} de ${ui.fmt(c.pessoas)} ${c.pessoas === 1 ? 'pessoa' : 'pessoas'} da UMa: ${ui.fmt(total, 1)} m no total.</p>`;
+  const quem = `${ui.fmt(c.subidas)} ${c.subidas === 1 ? 'subida' : 'subidas'} de ${ui.fmt(c.pessoas)} ${c.pessoas === 1 ? 'pessoa' : 'pessoas'} da UMa`;
+  const extra = `<p class="muted pequeno" style="margin:0">${aposSubida ? `A tua subida juntou-se a ${quem}` : `Até agora: ${quem}`}: ${ui.fmt(total, 1)} m no total.</p>`;
   return `<section class="cartao destaque" data-variante-ecra="A">
     ${blocoRota(CONFIG.rotaColetiva, total, estaSubidaM, {
       sujeito: 'A UMa chegou ao', chegou: (n) => `Chegámos ao ${n}!`, extra })}
@@ -518,20 +518,36 @@ function cartaoPessoal(pe, estaSubidaM) {
 }
 
 // ---------------------------------------------------------------------
-// Partes comuns às duas versões (meta, sequência, medalhas)
+// Perfil: sempre visível (no ecrã de progresso e depois de cada leitura).
+// Rota e histórico seguem o grupo: A e sem conta -> UMa; B -> pessoal.
 // ---------------------------------------------------------------------
-function desenharComum() {
-  const alvo = document.getElementById('comum');
-  if (!alvo || !estadoAtual?.existe) return;
-  const r = resumo(estadoAtual);
-  const novas = ui.medalhasNovas(r);
-  alvo.innerHTML = ui.cartaoSemana(r) + ui.cartaoMedalhas(r, novas);
+function desenharPerfil(estaSubidaM = 0, aposSubida = false, { animado = true } = {}) {
+  const alvo = document.getElementById('perfil');
+  if (!alvo || !estadoAtual) return;
+  const e = estadoAtual;
+  let html = '';
+  if (e.coletivo) {
+    html += cartaoColetivo(e.coletivo, estaSubidaM, aposSubida);
+    html += ui.cartaoHistorico(e.coletivo.dias, e.coletivo.hoje || e.hoje, {
+      titulo: 'Subidas da UMa', vazio: 'Ainda ninguém subiu nestes dias. Sê o primeiro!' });
+  } else if (e.pessoal) {
+    html += cartaoPessoal(e.pessoal, estaSubidaM);
+    html += ui.cartaoHistorico(e.dias, e.hoje, {
+      titulo: 'As tuas subidas', vazio: 'Ainda sem subidas nestes dias. A primeira está à distância de um QR.' });
+  }
+  const r = resumo(e);
+  html += ui.cartaoSemana(r) + ui.cartaoMedalhas(r, ui.medalhasNovas(r));
+  alvo.innerHTML = html;
+  animar(alvo, animado);
 }
 
-function animar() {
-  document.querySelectorAll('[data-contar]').forEach((el) =>
-    ui.contar(el, Number(el.dataset.contar), Number(el.dataset.casas || 0)));
-  document.querySelectorAll('.barra > span[data-ate]').forEach((el) => {
+function animar(raiz = document, animado = true) {
+  raiz.querySelectorAll('[data-contar]').forEach((el) => {
+    const v = Number(el.dataset.contar), casas = Number(el.dataset.casas || 0);
+    if (animado) ui.contar(el, v, casas); else el.textContent = ui.fmt(v, casas);
+  });
+  raiz.querySelectorAll('.barra > span[data-ate]').forEach((el) => {
+    if (!animado) { el.style.width = `${el.dataset.ate}%`; return; }
     el.style.width = `${el.dataset.de}%`;
     requestAnimationFrame(() => requestAnimationFrame(() => { el.style.width = `${el.dataset.ate}%`; }));
   });
@@ -549,7 +565,7 @@ ecra.addEventListener('click', async (ev) => {
   b.disabled = true;
   try {
     const r = await rpc('definir_meta', { p_user_id: userId, p_meta: meta });
-    if (r.ok) { estadoAtual.meta_semanal = r.meta_semanal; desenharComum(); }
+    if (r.ok) { estadoAtual.meta_semanal = r.meta_semanal; desenharPerfil(0, false, { animado: false }); }
   } catch (e) {
     console.error(e);
     b.disabled = false;

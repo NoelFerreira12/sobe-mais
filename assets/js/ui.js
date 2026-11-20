@@ -154,6 +154,40 @@ export function cartaoSemana(r) {
   </section>`;
 }
 
+/**
+ * Histórico dos últimos 14 dias em barras (SVG, sem bibliotecas).
+ * dias = [{ d: 'AAAA-MM-DD', n }], hoje = 'AAAA-MM-DD' (hora da Madeira, vinda do servidor).
+ */
+export function cartaoHistorico(dias, hoje, { titulo, vazio, n = 14 } = {}) {
+  const base = hoje || new Date().toISOString().slice(0, 10);
+  const mapa = new Map((dias || []).map((x) => [x.d, Number(x.n)]));
+  const lista = Array.from({ length: n }, (_, i) => {
+    const dt = new Date(`${base}T00:00:00Z`);
+    dt.setUTCDate(dt.getUTCDate() - (n - 1 - i));
+    const d = dt.toISOString().slice(0, 10);
+    return { d, n: mapa.get(d) || 0, dia: dt.getUTCDay(), hoje: i === n - 1 };
+  });
+  const total = lista.reduce((s, x) => s + x.n, 0);
+  const max = Math.max(1, ...lista.map((x) => x.n));
+  const W = 320, H = 132, topo = 18, baixo = 22, ih = H - topo - baixo, bw = W / n, larg = Math.min(16, bw * 0.62);
+  const letras = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+  const barras = lista.map((x, i) => {
+    const cx = bw * i + bw / 2, h = x.n ? Math.max(4, (x.n / max) * ih) : 0, y = topo + ih - h, r = Math.min(4, larg / 2);
+    const barra = h ? `<path d="M${cx - larg / 2},${topo + ih}V${y + r}Q${cx - larg / 2},${y} ${cx - larg / 2 + r},${y}H${cx + larg / 2 - r}Q${cx + larg / 2},${y} ${cx + larg / 2},${y + r}V${topo + ih}Z" fill="${x.hoje ? 'var(--laranja)' : 'var(--laranja-hist)'}"/>`
+      : `<rect x="${cx - larg / 2}" y="${topo + ih - 2}" width="${larg}" height="2" rx="1" fill="var(--borda)"/>`;
+    const valor = x.n ? `<text x="${cx}" y="${y - 4}" text-anchor="middle" class="hist-valor">${x.n}</text>` : '';
+    const rotulo = `<text x="${cx}" y="${H - 6}" text-anchor="middle" class="hist-eixo${x.hoje ? ' hoje' : ''}">${x.hoje ? 'hoje' : letras[x.dia]}</text>`;
+    return `<g><title>${x.d.slice(8, 10)}/${x.d.slice(5, 7)}: ${x.n} ${x.n === 1 ? 'subida' : 'subidas'}</title>${barra}${valor}${rotulo}</g>`;
+  }).join('');
+  return `<section class="cartao">
+    <div class="semana-linha"><h2 style="margin:0">${titulo}</h2>
+      <span class="muted pequeno">${total} ${total === 1 ? 'subida' : 'subidas'} em ${n} dias</span></div>
+    ${total ? `<svg class="historico" viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="${titulo}: ${total} subidas nos últimos ${n} dias">${barras}</svg>`
+      : `<p class="muted" style="margin:10px 0 0">${vazio}</p>`}
+  </section>`;
+}
+
 export function cartaoMedalhas(r, novas = new Set()) {
   return `<section class="cartao">
     <h2>Medalhas</h2>

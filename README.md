@@ -22,7 +22,7 @@ Cada piso tem um QR code. A pessoa lê o QR do piso onde está, sobe e lê o QR 
 2. Na primeira visita aparece o aviso de privacidade. Ao aceitar, o telemóvel gera um ID anónimo (UUID), que fica em cookie e em localStorage.
 3. No primeiro scan, o servidor sorteia a variante A ou B (50/50). A variante desse ID nunca muda.
 4. Cada scan fica gravado com o ID anónimo, o token, o piso, a variante e a hora do servidor.
-5. Uma subida é válida quando há um scan num piso seguido de um scan num piso **mais alto**, com 12 a 180 segundos **por andar** subido. Descer não conta. O piso de chegada serve também de início para a próxima subida. Depois de uma subida válida, as subidas desse ID só voltam a contar passados 5 min. Os scans que não cumprem as regras ficam guardados, mas não contam.
+5. Uma subida é válida quando há um scan num piso seguido de um scan num piso **mais alto**, com 12 a 180 segundos **por andar** subido. Descer não conta. **Qualquer leitura que não seja uma subida válida passa a ser o novo ponto de partida**: o ecrã diz "Começaste no Piso X!", mesmo depois de descer ou de uma leitura esquecida, e ler o mesmo QR outra vez diz "Já estás a começar no Piso X". Uma leitura só serve de ponto de partida durante a janela máxima de uma subida (180 s × 6 lanços = 18 min). Depois disso, a próxima leitura é sempre um início novo. O piso de chegada serve também de início para a próxima subida. Depois de uma subida válida, as subidas desse ID só voltam a contar passados 5 min. Os scans que não cumprem as regras ficam guardados, mas não contam.
 
 ### Ler o QR dentro ou fora da app
 
@@ -35,7 +35,7 @@ O site tem um `manifest.webmanifest`, por isso pode ser instalado no telemóvel 
 
 ### Teste A/B
 
-Quem tem conta fica, no primeiro scan, num de dois grupos: **A (coletivo)** ou **B (pessoal)**. O grupo nunca muda. A atribuição é **equilibrada**, para haver tantos dados de um grupo como do outro: cada conta nova vai para o grupo com **menos contas**, e em caso de empate decide-se ao acaso. As atribuições simultâneas são feitas uma de cada vez (advisory lock), por isso os grupos nunca diferem em mais de 1 conta.
+Quem tem conta fica, **logo ao criar a conta**, num de dois grupos: **A (coletivo)** ou **B (pessoal)**. O grupo nunca muda. Assim, o perfil ("O meu progresso") mostra desde o início a rota do grupo, o histórico dos últimos 14 dias (A: subidas da UMa; B: as próprias subidas), a meta semanal, a sequência e as medalhas. A atribuição é **equilibrada**, para haver tantos dados de um grupo como do outro: cada conta nova vai para o grupo com **menos contas**, e em caso de empate decide-se ao acaso. As atribuições simultâneas são feitas uma de cada vez (advisory lock), por isso os grupos nunca diferem em mais de 1 conta.
 
 Quem usa **sem conta** vê sempre o **coletivo**, mas fica **fora da análise A/B**. Se mais tarde criar conta nesse telemóvel, a conta fica marcada como `ex_convidado`, porque já viu o coletivo. No painel há uma opção para excluir essas contas da análise, e no CSV há as colunas `tem_conta` e `ex_convidado`.
 
