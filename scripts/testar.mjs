@@ -20,6 +20,16 @@ process.on('exit', () => {
 });
 
 const comPainel = process.argv.includes('--painel');
+
+// Os testes correm contra a base de dados REAL: durante o estudo, as subidas de teste
+// aparecem por momentos no total da UMa que os participantes veem. Só com --forcar.
+const hojeMadeira = new Date().toLocaleDateString('sv-SE', { timeZone: 'Atlantic/Madeira' });
+if (hojeMadeira >= CONFIG.estudo.inicio && hojeMadeira <= CONFIG.estudo.fim && !process.argv.includes('--forcar')) {
+  console.error(`O estudo está a decorrer (${CONFIG.estudo.inicio} a ${CONFIG.estudo.fim}).`);
+  console.error('Estes testes criam subidas na base de dados real, que aparecem por momentos aos participantes.');
+  console.error('Se tiveres mesmo de testar: npm run testar -- --forcar   (de preferência à noite).');
+  process.exit(1);
+}
 const password = env('PAINEL_PASSWORD');
 if (!password) { console.error('Falta PAINEL_PASSWORD no .env'); process.exit(1); }
 
