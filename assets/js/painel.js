@@ -1,6 +1,6 @@
-import { CONFIG } from '../../config.js?v=202611201111';
-import { rpc } from './api.js?v=202611201111';
-import * as ui from './ui.js?v=202611201111';
+import { CONFIG } from '../../config.js?v=202611201238';
+import { rpc } from './api.js?v=202611201238';
+import * as ui from './ui.js?v=202611201238';
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
@@ -355,7 +355,7 @@ function cartaoQualidade(d) {
   const q = d.qualidade;
   if (!q) return '';
   const tipos = [
-    ['valida', 'Subida válida'], ['inicio', 'Início de subida'], ['descer', 'Desceu (novo início)'],
+    ['valida', 'Subida válida'], ['continua', 'Continuou a subir (+andares)'], ['inicio', 'Início de subida'], ['descer', 'Desceu (novo início)'],
     ['rapido', 'Rápido demais'], ['lento', 'Passou muito tempo'], ['cooldown', 'Intervalo de 5 min'],
     ['repetido', 'QR lido 2× seguidas'],
   ];
@@ -374,7 +374,8 @@ function cartaoQualidade(d) {
       <tbody>${linhas}<tr><td><strong>Total de leituras</strong></td>${['A', 'B', 'G'].map((g) => `<td class="n"><strong>${tot(g)}</strong></td>`).join('')}</tr></tbody>
     </table></div>
     <p class="nota" style="margin:10px 0 0">Muitas leituras "rápido demais" ou "QR lido 2× seguidas" indicam que as regras não estão a ser
-      percebidas (ou tentativas de batota). As leituras "Desceu" e "Passou muito tempo" contam como novos inícios.</p>
+      percebidas (ou tentativas de batota). As leituras "Desceu" e "Passou muito tempo" contam como novos inícios.
+      "Continuou a subir" é quem leu o QR em vários pisos seguidos: soma andares à mesma subida, sem contar como subida nova.</p>
   </section>`;
 }
 

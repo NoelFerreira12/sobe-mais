@@ -1,9 +1,9 @@
-import { CONFIG } from '../../config.js?v=202611201111';
-import { rpc } from './api.js?v=202611201111';
-import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js?v=202611201111';
-import { resumo, metros, metrosSubida, progressoRota } from './calc.js?v=202611201111';
-import * as ui from './ui.js?v=202611201111';
-import { lerQR } from './leitor.js?v=202611201111';
+import { CONFIG } from '../../config.js?v=202611201238';
+import { rpc } from './api.js?v=202611201238';
+import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js?v=202611201238';
+import { resumo, metros, metrosSubida, progressoRota } from './calc.js?v=202611201238';
+import * as ui from './ui.js?v=202611201238';
+import { lerQR } from './leitor.js?v=202611201238';
 
 const botaoLer = (txt = 'Ler QR do piso', cls = '') =>
   `<button class="btn ${cls}" type="button" data-ler>${ui.ICONES.qr}<span>${txt}</span></button>`;
@@ -325,6 +325,13 @@ function textoResultado(r) {
       return { cls: 'ok', icone: 'check', titulo: 'Subida registada!',
         grande: `+${r.andares} ${r.andares === 1 ? 'andar' : 'andares'}`,
         texto: `Do ${P(r.piso_origem)} ao ${P(r.piso)}.` };
+    case 'continua': {
+      const total = r.andares_subida || r.andares;
+      return { cls: 'ok', icone: 'subir', titulo: noTopo ? 'Chegaste ao topo!' : 'Continuas a subir!', partida: !noTopo,
+        grande: `+${r.andares} ${r.andares === 1 ? 'andar' : 'andares'}`,
+        texto: `Do ${P(r.piso_origem)} ao ${P(r.piso)}. Esta subida já vai em ${total} ${total === 1 ? 'andar' : 'andares'}.`,
+        extra: noTopo ? '' : 'Se continuares, lê o QR do próximo piso.' };
+    }
     case 'rapido':
       return { cls: 'aviso', icone: 'relogio', titulo: 'Foste rápido demais', partida: !noTopo,
         texto: `Para contar, ${r.andares} ${r.andares === 1 ? 'andar tem' : 'andares têm'} de demorar pelo menos ${ui.duracao(r.min_seg)}. Sobe com calma, ao teu ritmo.`,
@@ -338,7 +345,7 @@ function textoResultado(r) {
     }
     case 'repetido': {
       const u = r.estado?.ultimo_scan;
-      if (u && u.resultado === 'valida' && u.piso === r.piso) {
+      if (u && (u.resultado === 'valida' || u.resultado === 'continua') && u.piso === r.piso) {
         return { cls: 'ok', icone: 'check', titulo: 'Esta subida já está registada', partida: !noTopo,
           texto: noTopo ? 'Chegaste ao topo. Para a próxima subida, lê o QR do piso onde começares.'
             : `Chegaste ao ${P(r.piso)}. Se continuares a subir, este piso é o ponto de partida.` };
@@ -354,7 +361,8 @@ function textoResultado(r) {
 
 function mostrarResultado(r) {
   const t = textoResultado(r);
-  const valida = r.resultado === 'valida';
+  // 'continua' soma andares à mesma subida: conta para a rota como uma subida válida.
+  const valida = r.resultado === 'valida' || r.resultado === 'continua';
   ecra.innerHTML = `
     <section class="cartao resultado ${t.cls} aparecer">
       <div class="icone">${ui.ICONES[t.icone]}</div>
@@ -370,9 +378,11 @@ function mostrarResultado(r) {
     <div id="perfil" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>`;
   // Depois de uma subida válida, a rota anima desde o valor anterior.
   desenharPerfil(valida ? metrosSubida(r.piso_origem, r.piso) : 0, valida);
-  if (valida) {
+  if (r.resultado === 'valida') {
     ui.vibrar();
     setTimeout(ui.confettis, 250);
+  } else if (r.resultado === 'continua') {
+    ui.vibrar([30, 40, 30]);
   } else if (t.partida) {
     ui.vibrar(25);
   }
