@@ -1,7 +1,7 @@
-import { CONFIG } from '../../config.js?v=202611241512';
-import { rpc } from './api.js?v=202611241512';
-import * as ui from './ui.js?v=202611241512';
-import { metros, progressoRota } from './calc.js?v=202611241512';
+import { CONFIG } from '../../config.js?v=202611241533';
+import { rpc } from './api.js?v=202611241533';
+import * as ui from './ui.js?v=202611241533';
+import { metros, progressoRota } from './calc.js?v=202611241533';
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
@@ -79,8 +79,6 @@ const f1 = (x, c = 1) => (Number.isFinite(x) ? ui.fmt(x, c) : '—');
 const pct = (x) => (Number.isFinite(x) ? `${ui.fmt(x * 100, 0)}%` : '—');
 const fp = (r) => (r ? (r.p < 0.001 ? 'p < 0,001' : `p = ${ui.fmt(r.p, 3)}`) : 'dados insuficientes');
 
-/** Quantos participantes (com subida) do grupo não têm conta. */
-const semConta = (G) => G.part.filter((l) => l.tem_conta === false).length;
 
 /**
  * A janela de 7 dias do H1 (do 1.º scan até 7 dias depois) está completa se já passou
@@ -151,13 +149,14 @@ async function entrar(pw) {
 // Painel
 // ---------------------------------------------------------------------
 let dados = null;
+let maisAberto = false; // "Mais" fica aberto quando se muda uma opção lá dentro
 
 function mostrarPainel(d) {
   dados = d;
   const semEx = excluirEx();
   const nEx = { A: 0, B: 0 };
   d.participantes.forEach((l) => { if (l.ex_convidado && l.subidas >= 1 && nEx[l.variante] != null) nEx[l.variante]++; });
-  // Análise A/B: só contas (A e B). Sem conta (G) fica sempre de fora.
+  // Análise A/B: só A e B. Os antigos "sem grupo" (G) ficam sempre de fora.
   const L = d.participantes.filter((l) => (l.variante === 'A' || l.variante === 'B') && !(semEx && l.ex_convidado));
   const e = d.estudo;
   const A = grupo(L, 'A', e), B = grupo(L, 'B', e);
@@ -166,120 +165,120 @@ function mostrarPainel(d) {
   const h1rep = mannWhitney(A.rep7, B.rep7);
   const h1sub = mannWhitney(A.sub7, B.sub7);
   const mwTaxa = mannWhitney(A.taxa, B.taxa);
-  const estadoEstudo = e.hoje < e.inicio ? `Começa a ${dataPt(e.inicio)}`
-    : e.hoje > e.fim ? 'Recolha terminada' : `A decorrer: dia ${diasEntre(e.inicio, e.hoje) + 1} de ${diasEntre(e.inicio, e.fim) + 1}`;
-
-  const linha = (rot, a, b, nota = '') => `<tr><td>${rot}${nota ? `<div class="nota">${nota}</div>` : ''}</td><td class="n">${a}</td><td class="n">${b}</td></tr>`;
+  const estado = e.hoje < e.inicio ? `começa a ${dataPt(e.inicio)}`
+    : e.hoje > e.fim ? 'terminado' : `dia ${diasEntre(e.inicio, e.hoje) + 1} de ${diasEntre(e.inicio, e.fim) + 1}`;
+  const veredito = !h1rep ? 'Ainda poucos dados'
+    : h1rep.p < 0.05 ? `A sobe mais do que B · ${fp(h1rep)}`
+    : `${e.hoje > e.fim ? 'Sem diferença significativa' : 'Ainda sem diferença'} · ${fp(h1rep)}`;
+  const cor = (v) => `<i class="cor" style="background:var(--serie-${v.toLowerCase()})"></i>`;
+  const linha = (rot, a, b, p = '') => `<tr><td>${rot}</td><td class="n">${a}</td><td class="n">${b}</td><td class="n nota">${p}</td></tr>`;
+  const mm = (x, y) => `${f1(x, 1)} / ${f1(y, 1)}`;
+  const pc = (r) => (r ? (r.p < 0.001 ? '<0,001' : ui.fmt(r.p, 2)) : '—');
 
   ecra.innerHTML = `
     <div class="meta-linha" style="align-items:center;flex-wrap:wrap">
       <div><h1 style="margin:8px 0 0">Painel do docente</h1>
-        <p class="muted" style="margin:0">Estudo de ${dataPt(e.inicio)} a ${dataPt(e.fim)} · ${estadoEstudo}</p></div>
+        <p class="muted" style="margin:0">${dataPt(e.inicio)} – ${dataPt(e.fim)} · ${estado}</p></div>
       <div class="botoes">
         <button class="btn pequeno secundario" id="atualizar">Atualizar</button>
-        <a class="btn pequeno secundario" href="../cartazes/">Cartazes</a>
         <button class="btn pequeno secundario" id="sair">Sair</button>
       </div>
     </div>
 
-    <label class="cartao" style="display:flex;gap:12px;align-items:flex-start;padding:14px 18px;cursor:pointer;${d.inclui_fora ? 'border-color:var(--aviso);background:var(--aviso-suave)' : ''}">
-      <input type="checkbox" id="testes" ${d.inclui_fora ? 'checked' : ''} style="width:22px;height:22px;margin-top:2px;accent-color:var(--laranja)">
-      <span><strong>Incluir leituras de teste (fora do estudo)</strong>
-        <span class="nota" style="display:block">${d.inclui_fora
-          ? 'A mostrar também as leituras antes de ' + dataPt(e.inicio) + ' e depois de ' + dataPt(e.fim) + '. <strong>Não uses estes números na análise.</strong>'
-          : `Só contam as leituras de ${dataPt(e.inicio)} a ${dataPt(e.fim)}. Há ${d.scans_fora_estudo} ${d.scans_fora_estudo === 1 ? 'leitura' : 'leituras'} fora do estudo (ex.: testes antes do lançamento).`}</span></span>
-    </label>
-    <label class="cartao" style="display:flex;gap:12px;align-items:flex-start;padding:14px 18px;cursor:pointer">
-      <input type="checkbox" id="sem-ex" ${semEx ? 'checked' : ''} style="width:22px;height:22px;margin-top:2px;accent-color:var(--laranja)">
-      <span><strong>Excluir da análise quem usou sem grupo antes de criar conta</strong>
-        <span class="nota" style="display:block">Pessoas que, até 20/11, usaram o Sobe+ sem conta (sempre com o coletivo) e só depois criaram conta.
-          Com subida: A = ${nEx.A}, B = ${nEx.B}. Desde 20/11, quem não tem conta também é sorteado A/B e entra na análise.</span></span>
-    </label>
+    ${d.inclui_fora ? `<p class="aviso-caixa" style="margin:0">A mostrar leituras de teste: não usar na análise.
+      <button class="ligacao-btn" id="tirar-testes">Tirar</button></p>` : ''}
 
     <div class="grelha">
       <section class="cartao kpi">
-        <div class="rotulo">Participantes (≥ 1 subida válida)</div>
+        <div class="rotulo">Participantes</div>
         <div class="valor num">${total}<span class="muted" style="font-size:1.1rem"> / ${obj}</span></div>
         <div class="barra alvo" style="margin:10px 0 6px"><span style="width:${Math.min(100, total / obj * 100)}%"></span></div>
-        <div class="nota">Mínimo ${min}${total >= min ? ' — atingido' : ` — faltam ${min - total}`}</div>
+        <div class="nota">${total >= min ? `Mínimo de ${min} atingido` : `Faltam ${min - total} para o mínimo (${min})`}</div>
       </section>
-      <section class="cartao kpi">
-        <div class="rotulo"><i style="background:var(--serie-a);width:10px;height:10px;border-radius:2px;display:inline-block"></i> Versão A · coletivo</div>
-        <div class="valor num">${A.n}</div><div class="nota">${A.ids} IDs com pelo menos 1 leitura · ${semConta(A)} sem conta</div>
-      </section>
-      <section class="cartao kpi">
-        <div class="rotulo"><i style="background:var(--serie-b);width:10px;height:10px;border-radius:2px;display:inline-block"></i> Versão B · pessoal</div>
-        <div class="valor num">${B.n}</div><div class="nota">${B.ids} IDs com pelo menos 1 leitura · ${semConta(B)} sem conta</div>
-      </section>
-      <section class="cartao kpi">
-        <div class="rotulo">Sem grupo (até 20/11, fora do A/B)</div>
-        <div class="valor num">${d.convidados?.com_subida ?? 0}</div>
-        <div class="nota">${d.convidados?.ids ?? 0} IDs sem conta de antes do sorteio para todos · ${d.convidados?.subidas ?? 0} subidas válidas (contam para o total coletivo) · ${d.contas ?? 0} contas criadas</div>
-      </section>
+      <section class="cartao kpi"><div class="rotulo">${cor('A')}A · coletivo</div><div class="valor num">${A.n}</div></section>
+      <section class="cartao kpi"><div class="rotulo">${cor('B')}B · pessoal</div><div class="valor num">${B.n}</div></section>
     </div>
 
-    ${cartaoMeta(d.coletivo)}
+    <section class="cartao">
+      <h2>H1 · subidas repetidas na 1.ª semana</h2>
+      <div class="duelo">
+        <div>${cor('A')}A <span class="num">${f1(A.rep7Media, 1)}</span></div>
+        <div>${cor('B')}B <span class="num">${f1(B.rep7Media, 1)}</span></div>
+      </div>
+      <p style="margin:10px 0 0"><strong>${veredito}</strong></p>
+      <p class="nota" style="margin:4px 0 0">Média por pessoa · ${A.n7} vs ${B.n7} pessoas com a 1.ª semana completa</p>
+    </section>
 
     <section class="cartao">
-      <h2>Comparação A vs B</h2>
+      <h2>A vs B</h2>
       <div class="tabela-scroll"><table>
-        <thead><tr><th>Métrica (participantes A/B, com ou sem conta)</th><th class="n">A · coletivo</th><th class="n">B · pessoal</th></tr></thead>
+        <thead><tr><th>Média / mediana</th><th class="n">A</th><th class="n">B</th><th class="n">p</th></tr></thead>
         <tbody>
-          ${linha('Participantes', A.n, B.n)}
-          ${linha('Subidas válidas por semana — média', f1(A.taxaMedia, 2), f1(B.taxaMedia, 2), `Subidas ÷ semanas desde o 1.º scan (mín. 1). Mann–Whitney A&gt;B: ${fp(mwTaxa)}`)}
-          ${linha('Subidas válidas por semana — mediana', f1(A.taxaMediana, 2), f1(B.taxaMediana, 2))}
-          ${linha('Sobem em 2 ou mais dias diferentes', pct(A.dois), pct(B.dois))}
-          ${linha('<strong>H1</strong> · participantes com os 7 dias completos', A.n7, B.n7,
-            `As linhas H1 e "7 dias" só contam quem fez o 1.º scan há mais de 7 dias e até ${dataPt(somar(e.fim, -7))}
-             (a janela tem de caber no estudo). Fora do H1: A = ${A.n - A.n7}, B = ${B.n - B.n7}.`)}
-          ${linha('<strong>H1</strong> · subidas repetidas nos 7 dias após o 1.º scan — média', f1(A.rep7Media, 2), f1(B.rep7Media, 2), `Repetidas = subidas válidas nesses 7 dias, menos a primeira. Mann–Whitney A&gt;B: <strong>${fp(h1rep)}</strong>`)}
-          ${linha('H1 · subidas repetidas (7 dias) — mediana', f1(A.rep7Mediana, 1), f1(B.rep7Mediana, 1))}
-          ${linha('H1 · com pelo menos 1 subida repetida (7 dias)', pct(A.rep7Algum), pct(B.rep7Algum))}
-          ${linha('Subidas válidas nos 7 dias após o 1.º scan — média / mediana', `${f1(A.sub7Media, 2)} / ${f1(A.sub7Mediana, 1)}`, `${f1(B.sub7Media, 2)} / ${f1(B.sub7Mediana, 1)}`, `Mann–Whitney A&gt;B: ${fp(h1sub)}`)}
+          ${linha('Repetidas na 1.ª semana (H1)', mm(A.rep7Media, A.rep7Mediana), mm(B.rep7Media, B.rep7Mediana), pc(h1rep))}
+          ${linha('Subidas na 1.ª semana', mm(A.sub7Media, A.sub7Mediana), mm(B.sub7Media, B.sub7Mediana), pc(h1sub))}
+          ${linha('Subidas por semana', mm(A.taxaMedia, A.taxaMediana), mm(B.taxaMedia, B.taxaMediana), pc(mwTaxa))}
+          ${linha('Voltaram a subir noutro dia', pct(A.dois), pct(B.dois))}
         </tbody>
       </table></div>
-      <p class="nota" style="margin:10px 0 0">Testes de Mann–Whitney unilaterais (A&gt;B): p exato (permutação, empates com ordens médias)
-        até ${MAX_EXATO} participantes no teste; acima disso, aproximação normal. Confirma no R/SPSS com o CSV.
-        Só contam leituras dentro do período do estudo. Leituras fora do estudo: ${d.scans_fora_estudo}.</p>
     </section>
 
     <section class="cartao">
-      <h2>Subidas válidas por semana do estudo</h2>
-      <div class="tabela-scroll">${tabelaSemanas(A, B, e)}</div>
-    </section>
-
-    <section class="cartao">
-      <h2>Subidas válidas por dia</h2>
+      <h2>Subidas por dia</h2>
       <div class="legenda" aria-hidden="true">
-        <span><i style="background:var(--serie-a)"></i>A · coletivo</span>
-        <span><i style="background:var(--serie-b)"></i>B · pessoal</span>
+        <span><i style="background:var(--serie-a)"></i>A</span>
+        <span><i style="background:var(--serie-b)"></i>B</span>
       </div>
       <div class="grafico" id="grafico">${grafico(d.diario)}<div class="dica" id="dica"></div></div>
-      <details style="margin-top:10px"><summary class="ligacao-btn" style="display:inline-block">Ver tabela</summary>
+      <details style="margin-top:10px"><summary class="ligacao-btn" style="display:inline-block">Por semana</summary>
+        <div class="tabela-scroll">${tabelaSemanas(A, B, e)}</div>
+      </details>
+      <details><summary class="ligacao-btn" style="display:inline-block">Por dia</summary>
         <div class="tabela-scroll"><table>
-          <thead><tr><th>Dia</th><th class="n">A subidas</th><th class="n">A pessoas</th><th class="n">B subidas</th><th class="n">B pessoas</th><th class="n">Sem grupo</th></tr></thead>
-          <tbody>${d.diario.map((x) => `<tr><td>${dataPt(x.dia)}</td><td class="n">${x.A}</td><td class="n">${x.A_pessoas}</td><td class="n">${x.B}</td><td class="n">${x.B_pessoas}</td><td class="n">${x.G ?? 0}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Ainda sem dias de estudo.</td></tr>'}</tbody>
+          <thead><tr><th>Dia</th><th class="n">A</th><th class="n">pessoas</th><th class="n">B</th><th class="n">pessoas</th><th class="n">Sem grupo</th></tr></thead>
+          <tbody>${d.diario.map((x) => `<tr><td>${dataPt(x.dia)}</td><td class="n">${x.A}</td><td class="n">${x.A_pessoas}</td><td class="n">${x.B}</td><td class="n">${x.B_pessoas}</td><td class="n">${x.G ?? 0}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Ainda sem dias.</td></tr>'}</tbody>
         </table></div>
       </details>
     </section>
 
-    ${cartaoQualidade(d)}
+    ${cartaoMeta(d.coletivo)}
 
     <section class="cartao">
-      <h2>Exportar (CSV anónimo)</h2>
-      <p class="muted">Sem IDs reais: cada participante tem um pseudónimo (P001, P002, …), igual nos três ficheiros.</p>
+      <h2>Exportar CSV</h2>
       <div class="botoes">
-        <button class="btn pequeno" id="csv-part">CSV por participante</button>
-        <button class="btn pequeno" id="csv-dia">CSV por dia</button>
-        <button class="btn pequeno" id="csv-leituras">CSV de leituras</button>
+        <button class="btn pequeno" id="csv-part">Participantes</button>
+        <button class="btn pequeno" id="csv-dia">Dias</button>
+        <button class="btn pequeno" id="csv-leituras">Leituras</button>
       </div>
-      <p class="nota" style="margin:10px 0 0">O CSV de leituras tem uma linha por QR lido (data, hora, pisos, resultado, segundos).
-        Serve para análises por hora do dia ou por tempo de subida, e também como cópia de segurança dos dados.</p>
+      <p class="nota" style="margin:8px 0 0">Anónimo: P001, P002…</p>
     </section>
 
-    <p class="nota centro">Regras: ${d.regras.min_seg_por_andar}–${d.regras.max_seg_por_andar} s por andar ·
-      intervalo de ${Math.round(d.regras.cooldown_seg / 60)} min entre subidas · atualizado às ${new Date(d.gerado_em).toLocaleTimeString('pt-PT')}</p>`;
+    <details class="cartao mais-opcoes" ${maisAberto ? 'open' : ''}>
+      <summary><strong>Mais</strong> <span class="nota">opções, qualidade dos dados, como se calcula</span></summary>
+      <div class="pilha" style="margin-top:12px">
+        <label class="opcao"><input type="checkbox" id="testes" ${d.inclui_fora ? 'checked' : ''}>
+          <span>Incluir leituras de teste <span class="nota">(${d.scans_fora_estudo} fora do estudo)</span></span></label>
+        <label class="opcao"><input type="checkbox" id="sem-ex" ${semEx ? 'checked' : ''}>
+          <span>Excluir quem usou sem grupo antes de 20/11 <span class="nota">(A = ${nEx.A}, B = ${nEx.B})</span></span></label>
+        ${cartaoQualidade(d)}
+        <div class="nota">
+          <p style="margin:0 0 6px"><strong>Como se calcula.</strong> Participante = pelo menos 1 subida válida.
+            1.ª semana = 7 dias desde a 1.ª leitura; só conta quem a completou até ${dataPt(e.fim)}.
+            Repetidas = subidas nessa semana menos a primeira.</p>
+          <p style="margin:0 0 6px">p = Mann–Whitney unilateral A &gt; B (exato até ${MAX_EXATO} pessoas). Confirmar no R/SPSS.</p>
+          <p style="margin:0">Regras: ${d.regras.min_seg_por_andar}–${d.regras.max_seg_por_andar} s por andar,
+            ${Math.round(d.regras.cooldown_seg / 60)} min entre subidas. Antigos sem grupo: ${d.convidados?.com_subida ?? 0} pessoas,
+            ${d.convidados?.subidas ?? 0} subidas (fora do A/B). Contas: ${d.contas ?? 0}.</p>
+        </div>
+        <a class="ligacao-btn" href="../cartazes/">Cartazes</a>
+      </div>
+    </details>
 
+    <p class="nota centro">Atualizado às ${new Date(d.gerado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</p>`;
+
+  const definirTestes = (sim) => {
+    try { sessionStorage.setItem(CHAVE_TESTES, sim ? '1' : '0'); } catch { /* */ }
+    entrar(sessionStorage.getItem(CHAVE) || '');
+  };
   document.getElementById('atualizar').onclick = () => entrar(sessionStorage.getItem(CHAVE) || '');
   document.getElementById('sair').onclick = () => { sessionStorage.removeItem(CHAVE); mostrarLogin(); };
   const suf = d.inclui_fora ? '-com-testes' : '';
@@ -296,17 +295,15 @@ function mostrarPainel(d) {
         ...r.leituras.map((x) => [x.participante, x.variante, x.data, x.hora, x.piso_origem, x.piso, x.resultado,
           x.segundos, x.andares, x.no_estudo ? 'sim' : 'nao'])]));
     } catch (e) {
-      console.error(e); alert('Não foi possível exportar as leituras. Tenta outra vez.');
-    } finally { b.disabled = false; b.textContent = 'CSV de leituras'; }
+      console.error(e); alert('Não foi possível exportar. Tenta outra vez.');
+    } finally { b.disabled = false; b.textContent = 'Leituras'; }
   };
   document.getElementById('sem-ex').onchange = (ev) => {
     try { sessionStorage.setItem(CHAVE_EX, ev.target.checked ? '1' : '0'); } catch { /* */ }
-    mostrarPainel(dados);
+    maisAberto = true; mostrarPainel(dados);
   };
-  document.getElementById('testes').onchange = (ev) => {
-    try { sessionStorage.setItem(CHAVE_TESTES, ev.target.checked ? '1' : '0'); } catch { /* */ }
-    entrar(sessionStorage.getItem(CHAVE) || '');
-  };
+  document.getElementById('testes').onchange = (ev) => { maisAberto = true; definirTestes(ev.target.checked); };
+  document.getElementById('tirar-testes')?.addEventListener('click', () => definirTestes(false));
   ligarDicas(d.diario);
 }
 
@@ -322,8 +319,7 @@ function tabelaSemanas(A, B, e) {
     };
     linhas.push(`<tr><td>Semana ${k}<div class="nota">${dataPt(ini)} – ${dataPt(fim)}</div></td><td class="n">${stats(A)}</td><td class="n">${stats(B)}</td></tr>`);
   }
-  return `<table><thead><tr><th>Semana</th><th class="n">A · média / mediana</th><th class="n">B · média / mediana</th></tr></thead><tbody>${linhas.join('')}</tbody></table>
-    <p class="nota" style="margin:8px 0 0">Por participante, contando só quem já tinha feito o 1.º scan até ao fim dessa semana.</p>`;
+  return `<table><thead><tr><th>Subidas por pessoa</th><th class="n">A · média / mediana</th><th class="n">B · média / mediana</th></tr></thead><tbody>${linhas.join('')}</tbody></table>`;
 }
 
 // ---------------------------------------------------------------------
@@ -413,26 +409,19 @@ function cartaoMeta(c) {
     const cls = m.altitude <= p.atual ? 'feito' : (m === p.proximo ? 'proximo' : '');
     return `<li class="${cls}"><span>${m.nome}</span><span class="num" style="font-weight:700">${ui.fmt(m.altitude)} m</span></li>`;
   }).join('');
-  const proximo = p.proximo === topo
-    ? `Próxima meta: <strong>${topo.nome}</strong>, o topo. Faltam <strong>${ui.fmt(p.falta, 1)} m</strong>.`
-    : `Próxima meta: <strong>${p.proximo.nome}</strong> (${ui.fmt(p.proximo.altitude)} m). Faltam <strong>${ui.fmt(p.falta, 1)} m</strong>.`;
-  const feitos = p.marcos.filter((m) => m.altitude <= p.atual).length;
   return `<section class="cartao">
-    <h2>Meta coletiva (o que a versão A vê agora)</h2>
-    <span class="etiqueta">${rota.titulo}</span>
-    ${p.voltas >= 1 ? `<p style="margin:8px 0 0"><strong>${p.subidaN}.ª subida ao ${topo.nome}.</strong> A contagem recomeçou.</p>` : ''}
-    <div style="margin:10px 0 12px"><span class="metros-grande num">${ui.fmt(p.atual, 1)}</span>
-      <span class="muted"> m de ${ui.fmt(topo.altitude)} m</span></div>
+    <h2>Meta coletiva <span class="nota">(o que A vê na app)</span></h2>
+    ${p.voltas >= 1 ? `<p style="margin:0 0 6px"><strong>${p.subidaN}.ª subida ao ${topo.nome}</strong></p>` : ''}
+    <div style="margin:0 0 12px"><span class="metros-grande num">${ui.fmt(p.atual, 1)}</span>
+      <span class="muted"> m de ${ui.fmt(topo.altitude)} m · ${topo.nome}</span></div>
     <div class="barra" role="progressbar" aria-label="${rota.titulo}"
       aria-valuemin="0" aria-valuemax="${topo.altitude}" aria-valuenow="${Math.round(p.atual)}">
       <span style="width:${p.pct * 100}%"></span></div>
     <div class="marcos" aria-hidden="true">${ticks}</div>
-    <p style="margin:0 0 6px">${proximo}</p>
-    <p class="nota" style="margin:0">${ui.fmt(c.subidas)} ${c.subidas === 1 ? 'subida' : 'subidas'} de ${ui.fmt(c.pessoas)}
-      ${c.pessoas === 1 ? 'pessoa' : 'pessoas'} · ${ui.fmt(total, 1)} m no total · ${feitos} de ${p.marcos.length} metas.
-      Conta todas as leituras válidas (todos os grupos, também as de teste), tal como aparece na app.</p>
+    <p style="margin:0">Próxima: <strong>${p.proximo.nome}</strong> · faltam ${ui.fmt(p.falta, 1)} m</p>
+    <p class="nota" style="margin:4px 0 0">${ui.fmt(c.subidas)} subidas · ${ui.fmt(c.pessoas)} pessoas (todos os grupos)</p>
     <details class="mais-metas" style="margin-top:8px">
-      <summary><span>Ver todas as metas</span></summary>
+      <summary><span>Todas as metas</span></summary>
       <ul class="lista-marcos">${lista}</ul>
     </details>
   </section>`;
@@ -443,9 +432,9 @@ function cartaoQualidade(d) {
   const q = d.qualidade;
   if (!q) return '';
   const tipos = [
-    ['valida', 'Subida válida'], ['continua', 'Continuou a subir (+andares)'], ['inicio', 'Início de subida'], ['descer', 'Desceu (novo início)'],
-    ['rapido', 'Rápido demais'], ['lento', 'Passou muito tempo'], ['cooldown', 'Intervalo de 5 min'],
-    ['repetido', 'QR lido 2× seguidas'],
+    ['valida', 'Válida'], ['continua', 'Continuou (+andares)'], ['inicio', 'Início'], ['descer', 'Desceu'],
+    ['rapido', 'Rápido demais'], ['lento', 'Muito tempo'], ['cooldown', 'Intervalo 5 min'],
+    ['repetido', 'QR 2× seguidas'],
   ];
   const col = (g, t) => q.resultados?.[g]?.[t] ?? 0;
   const tot = (g) => tipos.reduce((s, [t]) => s + col(g, t), 0);
@@ -453,18 +442,16 @@ function cartaoQualidade(d) {
   const linhas = tipos.map(([t, rot]) => `<tr><td>${rot}</td>${['A', 'B', 'G'].map((g) =>
     `<td class="n">${col(g, t)}${pct(g, t)}</td>`).join('')}</tr>`).join('');
   const cA = q.contas_por_grupo?.A ?? 0, cB = q.contas_por_grupo?.B ?? 0;
-  return `<section class="cartao">
-    <h2>Qualidade dos dados</h2>
-    <p class="nota" style="margin:0 0 8px">Contas por grupo: <strong>A = ${cA}</strong>, <strong>B = ${cB}</strong>
-      ${Math.abs(cA - cB) <= 1 ? '(equilibrado)' : '(desequilibrado: verificar)'} · Contas sem nenhuma leitura: ${q.contas_sem_leituras ?? 0}</p>
+  return `<div>
+    <h3 style="margin:0 0 4px">Qualidade dos dados</h3>
+    <p class="nota" style="margin:0 0 8px">Contas: A = ${cA}, B = ${cB}${Math.abs(cA - cB) <= 1 ? '' : ' (desequilibrado)'} ·
+      sem leituras: ${q.contas_sem_leituras ?? 0}</p>
     <div class="tabela-scroll"><table>
-      <thead><tr><th>Resultado da leitura</th><th class="n">A</th><th class="n">B</th><th class="n">Sem grupo</th></tr></thead>
-      <tbody>${linhas}<tr><td><strong>Total de leituras</strong></td>${['A', 'B', 'G'].map((g) => `<td class="n"><strong>${tot(g)}</strong></td>`).join('')}</tr></tbody>
+      <thead><tr><th>Leitura</th><th class="n">A</th><th class="n">B</th><th class="n">Sem grupo</th></tr></thead>
+      <tbody>${linhas}<tr><td><strong>Total</strong></td>${['A', 'B', 'G'].map((g) => `<td class="n"><strong>${tot(g)}</strong></td>`).join('')}</tr></tbody>
     </table></div>
-    <p class="nota" style="margin:10px 0 0">Muitas leituras "rápido demais" ou "QR lido 2× seguidas" indicam que as regras não estão a ser
-      percebidas (ou tentativas de batota). As leituras "Desceu" e "Passou muito tempo" contam como novos inícios.
-      "Continuou a subir" é quem leu o QR em vários pisos seguidos: soma andares à mesma subida, sem contar como subida nova.</p>
-  </section>`;
+    <p class="nota" style="margin:8px 0 0">Muitos "rápido demais" ou "QR 2× seguidas" = regras mal percebidas.</p>
+  </div>`;
 }
 
 function csvDiario(d) {

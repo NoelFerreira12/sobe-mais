@@ -1,6 +1,6 @@
 // Leitor de QR dentro da app (câmara do telemóvel).
 // Usa o BarcodeDetector nativo quando existe (Android/Chrome) e o jsQR nos restantes (iPhone).
-import { CONFIG } from '../../config.js?v=202611241512';
+import { CONFIG } from '../../config.js?v=202611241533';
 
 const JSQR = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
 

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/app.css?v=202611241512">
+  <link rel="stylesheet" href="../assets/css/app.css?v=202611241533">
   <style>
     .app.largo { max-width: 980px; }
     .grelha { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
@@ -39,6 +39,12 @@
     .barra.alvo > span { transition-duration: .8s; }
     .h1 { font-weight: 800; }
     .nota { font-size: .85rem; color: var(--texto-2); }
+    i.cor { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+    .duelo { display: flex; gap: 32px; flex-wrap: wrap; font-weight: 700; color: var(--texto-2); }
+    .duelo .num { font-size: 2.4rem; color: var(--texto); margin-left: 4px; }
+    .mais-opcoes summary { cursor: pointer; }
+    .opcao { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+    .opcao input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--laranja); flex: none; }
   </style>
 </head>
 <body>
@@ -46,6 +52,6 @@
     <div id="topo"></div>
     <main id="ecra" class="pilha"></main>
   </div>
-  <script type="module" src="../assets/js/painel.js?v=202611241512"></script>
+  <script type="module" src="../assets/js/painel.js?v=202611241533"></script>
 </body>
 </html>
