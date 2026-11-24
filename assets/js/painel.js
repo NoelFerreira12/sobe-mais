@@ -1,7 +1,7 @@
-import { CONFIG } from '../../config.js?v=202611241451';
-import { rpc } from './api.js?v=202611241451';
-import * as ui from './ui.js?v=202611241451';
-import { metros, progressoRota } from './calc.js?v=202611241451';
+import { CONFIG } from '../../config.js?v=202611241512';
+import { rpc } from './api.js?v=202611241512';
+import * as ui from './ui.js?v=202611241512';
+import { metros, progressoRota } from './calc.js?v=202611241512';
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
@@ -26,7 +26,13 @@ function phi(z) { // função de distribuição normal padrão
   const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
   return z > 0 ? 1 - p : p;
 }
-/** Mann–Whitney U unilateral (H1: a > b), aproximação normal com correção de empates. */
+const MAX_EXATO = 80; // até aqui o teste é exato; acima, aproximação normal
+
+/**
+ * Mann–Whitney U unilateral (H1: a > b), com ordens médias nos empates.
+ * Até MAX_EXATO participantes: p exato (distribuição de permutação da soma das ordens de a).
+ * Acima disso: aproximação normal com correção de empates e de continuidade.
+ */
 function mannWhitney(a, b) {
   const n1 = a.length, n2 = b.length, N = n1 + n2;
   if (n1 < 2 || n2 < 2) return null;
@@ -41,10 +47,32 @@ function mannWhitney(a, b) {
   }
   const R1 = todos.filter((x) => x.g === 0).reduce((s, x) => s + x.r, 0);
   const U = R1 - n1 * (n1 + 1) / 2;
+  if (N <= MAX_EXATO) return { U, p: caudaExata(todos.map((x) => Math.round(x.r * 2)), n1, Math.round(R1 * 2)), exato: true };
   const sigma = Math.sqrt((n1 * n2 / 12) * ((N + 1) - empates / (N * (N - 1))));
-  if (!sigma) return { U, z: 0, p: 0.5 };
+  if (!sigma) return { U, p: 0.5, exato: false };
   const z = (U - n1 * n2 / 2 - 0.5) / sigma;
-  return { U, z, p: 1 - phi(z) };
+  return { U, p: 1 - phi(z), exato: false };
+}
+
+/**
+ * P(soma de k ordens escolhidas ao acaso ≥ obs). Ordens ×2 para serem inteiras (empates = x,5).
+ * formas[j][s] = n.º de formas de escolher j das ordens já vistas com soma s.
+ */
+function caudaExata(ordens2, k, obs) {
+  const max = ordens2.reduce((s, x) => s + x, 0);
+  const formas = Array.from({ length: k + 1 }, () => new Float64Array(max + 1));
+  formas[0][0] = 1;
+  let ate = 0;
+  for (const v of ordens2) {
+    ate += v;
+    for (let j = k; j >= 1; j--) {
+      const ant = formas[j - 1], at = formas[j];
+      for (let s = ate; s >= v; s--) at[s] += ant[s - v];
+    }
+  }
+  let total = 0, cauda = 0;
+  formas[k].forEach((c, s) => { total += c; if (s >= obs) cauda += c; });
+  return cauda / total;
 }
 
 const f1 = (x, c = 1) => (Number.isFinite(x) ? ui.fmt(x, c) : '—');
@@ -54,19 +82,26 @@ const fp = (r) => (r ? (r.p < 0.001 ? 'p < 0,001' : `p = ${ui.fmt(r.p, 3)}`) : '
 /** Quantos participantes (com subida) do grupo não têm conta. */
 const semConta = (G) => G.part.filter((l) => l.tem_conta === false).length;
 
-function grupo(linhas, v) {
+/**
+ * A janela de 7 dias do H1 (do 1.º scan até 7 dias depois) está completa se já passou
+ * e cabe toda no estudo. Sem isto, quem entrou há pouco (ou perto do fim) puxa o H1 para baixo.
+ */
+const janelaCompleta = (l, e) => somar(l.primeiro_dia, 7) < e.hoje && somar(l.primeiro_dia, 7) <= e.fim;
+
+function grupo(linhas, v, e) {
   const ids = linhas.filter((l) => l.variante === v);
   const part = ids.filter((l) => l.subidas >= 1);
   const taxa = part.map((l) => l.subidas / Math.max(1, l.semanas_expostas));
-  const sub7 = part.map((l) => l.subidas_7d);
-  const rep7 = part.map((l) => Math.max(0, l.subidas_7d - 1));
+  const h1 = part.filter((l) => janelaCompleta(l, e));
+  const sub7 = h1.map((l) => l.subidas_7d);
+  const rep7 = h1.map((l) => Math.max(0, l.subidas_7d - 1));
   return {
-    ids: ids.length, n: part.length, part, taxa, sub7, rep7,
+    ids: ids.length, n: part.length, part, taxa, n7: h1.length, sub7, rep7,
     taxaMedia: media(taxa), taxaMediana: mediana(taxa),
     dois: part.length ? part.filter((l) => l.dias >= 2).length / part.length : NaN,
     sub7Media: media(sub7), sub7Mediana: mediana(sub7),
     rep7Media: media(rep7), rep7Mediana: mediana(rep7),
-    rep7Algum: part.length ? rep7.filter((x) => x >= 1).length / part.length : NaN,
+    rep7Algum: h1.length ? rep7.filter((x) => x >= 1).length / h1.length : NaN,
   };
 }
 
@@ -124,10 +159,10 @@ function mostrarPainel(d) {
   d.participantes.forEach((l) => { if (l.ex_convidado && l.subidas >= 1 && nEx[l.variante] != null) nEx[l.variante]++; });
   // Análise A/B: só contas (A e B). Sem conta (G) fica sempre de fora.
   const L = d.participantes.filter((l) => (l.variante === 'A' || l.variante === 'B') && !(semEx && l.ex_convidado));
-  const A = grupo(L, 'A'), B = grupo(L, 'B');
+  const e = d.estudo;
+  const A = grupo(L, 'A', e), B = grupo(L, 'B', e);
   const total = A.n + B.n;
   const obj = CONFIG.objetivoParticipantes, min = CONFIG.minimoParticipantes;
-  const e = d.estudo;
   const h1rep = mannWhitney(A.rep7, B.rep7);
   const h1sub = mannWhitney(A.sub7, B.sub7);
   const mwTaxa = mannWhitney(A.taxa, B.taxa);
@@ -194,13 +229,17 @@ function mostrarPainel(d) {
           ${linha('Subidas válidas por semana — média', f1(A.taxaMedia, 2), f1(B.taxaMedia, 2), `Subidas ÷ semanas desde o 1.º scan (mín. 1). Mann–Whitney A&gt;B: ${fp(mwTaxa)}`)}
           ${linha('Subidas válidas por semana — mediana', f1(A.taxaMediana, 2), f1(B.taxaMediana, 2))}
           ${linha('Sobem em 2 ou mais dias diferentes', pct(A.dois), pct(B.dois))}
+          ${linha('<strong>H1</strong> · participantes com os 7 dias completos', A.n7, B.n7,
+            `As linhas H1 e "7 dias" só contam quem fez o 1.º scan há mais de 7 dias e até ${dataPt(somar(e.fim, -7))}
+             (a janela tem de caber no estudo). Fora do H1: A = ${A.n - A.n7}, B = ${B.n - B.n7}.`)}
           ${linha('<strong>H1</strong> · subidas repetidas nos 7 dias após o 1.º scan — média', f1(A.rep7Media, 2), f1(B.rep7Media, 2), `Repetidas = subidas válidas nesses 7 dias, menos a primeira. Mann–Whitney A&gt;B: <strong>${fp(h1rep)}</strong>`)}
           ${linha('H1 · subidas repetidas (7 dias) — mediana', f1(A.rep7Mediana, 1), f1(B.rep7Mediana, 1))}
           ${linha('H1 · com pelo menos 1 subida repetida (7 dias)', pct(A.rep7Algum), pct(B.rep7Algum))}
           ${linha('Subidas válidas nos 7 dias após o 1.º scan — média / mediana', `${f1(A.sub7Media, 2)} / ${f1(A.sub7Mediana, 1)}`, `${f1(B.sub7Media, 2)} / ${f1(B.sub7Mediana, 1)}`, `Mann–Whitney A&gt;B: ${fp(h1sub)}`)}
         </tbody>
       </table></div>
-      <p class="nota" style="margin:10px 0 0">Testes unilaterais com aproximação normal (indicativos; confirma no R/SPSS com o CSV).
+      <p class="nota" style="margin:10px 0 0">Testes de Mann–Whitney unilaterais (A&gt;B): p exato (permutação, empates com ordens médias)
+        até ${MAX_EXATO} participantes no teste; acima disso, aproximação normal. Confirma no R/SPSS com o CSV.
         Só contam leituras dentro do período do estudo. Leituras fora do estudo: ${d.scans_fora_estudo}.</p>
     </section>
 
@@ -354,10 +393,10 @@ function csv(linhas) {
 function csvParticipantes(d) {
   const n = d.estudo.semanas;
   const cab = ['participante', 'variante', 'tem_conta', 'ex_convidado', 'primeiro_dia', 'leituras', 'subidas_validas', 'andares',
-    'dias_diferentes', 'subidas_7d', 'repetidas_7d', 'semanas_expostas', 'subidas_por_semana', 'meta_semanal',
+    'dias_diferentes', 'subidas_7d', 'repetidas_7d', 'janela_7d_completa', 'semanas_expostas', 'subidas_por_semana', 'meta_semanal',
     ...Array.from({ length: n }, (_, k) => `semana_${k + 1}`)];
   const rows = d.participantes.map((l) => [l.id, l.variante, l.tem_conta ? 'sim' : 'nao', l.ex_convidado ? 'sim' : 'nao', l.primeiro_dia, l.n_scans, l.subidas, l.andares,
-    l.dias, l.subidas_7d, Math.max(0, l.subidas_7d - 1), l.semanas_expostas,
+    l.dias, l.subidas_7d, Math.max(0, l.subidas_7d - 1), janelaCompleta(l, d.estudo) ? 'sim' : 'nao', l.semanas_expostas,
     (l.subidas / Math.max(1, l.semanas_expostas)).toFixed(3), l.meta_semanal ?? '', ...l.por_semana]);
   return csv([cab, ...rows]);
 }

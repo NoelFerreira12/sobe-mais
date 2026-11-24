@@ -72,6 +72,12 @@ export const CONFIG = {
   objetivoParticipantes: 60,
   minimoParticipantes: 30,
 
+  // Questionário final (ex.: Google Forms). Vazio = não aparece.
+  // Aparece na app só a partir do último dia do estudo, para não influenciar as subidas.
+  // {grupo} é trocado pelo que a pessoa viu: 'coletivo' (A) ou 'pessoal' (B). Num Google Form,
+  // usa um link pré-preenchido, ex.: 'https://docs.google.com/forms/d/e/XXXX/viewform?entry.123={grupo}'
+  questionario: '',
+
   // Privacidade e termos (aparecem em /privacidade/ e /termos/).
   // Preenche com o email do grupo ou do docente responsável pelo projeto.
   contacto: '',

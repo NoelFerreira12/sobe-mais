@@ -1,9 +1,9 @@
-import { CONFIG } from '../../config.js?v=202611241451';
-import { rpc } from './api.js?v=202611241451';
-import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js?v=202611241451';
-import { resumo, metros, metrosSubida, progressoRota } from './calc.js?v=202611241451';
-import * as ui from './ui.js?v=202611241451';
-import { lerQR } from './leitor.js?v=202611241451';
+import { CONFIG } from '../../config.js?v=202611241512';
+import { rpc } from './api.js?v=202611241512';
+import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js?v=202611241512';
+import { resumo, metros, metrosSubida, progressoRota } from './calc.js?v=202611241512';
+import * as ui from './ui.js?v=202611241512';
+import { lerQR } from './leitor.js?v=202611241512';
 
 const botaoLer = (txt = 'Ler QR do piso', cls = '') =>
   `<button class="btn ${cls}" type="button" data-ler>${ui.ICONES.qr}<span>${txt}</span></button>`;
@@ -417,6 +417,7 @@ async function mostrarEstado() {
   const nome = limpaNome(estadoAtual.utilizador);
   ecra.innerHTML = `
     ${convidado ? '' : `<p class="ola aparecer">Olá, <strong>${nome}</strong></p>`}
+    ${cartaoQuestionario(estadoAtual)}
     <section class="cartao destaque aparecer">${aviso}</section>
     <div class="aparecer" style="margin-top:14px">${botaoLer()}</div>
     ${convidado ? cartaoSemConta('As tuas subidas contam na mesma.') : ''}
@@ -505,6 +506,18 @@ function mostrarApagar(convidado, erro = '') {
       <h1>Dados apagados</h1><p>Apagámos tudo o que estava associado a ${convidado ? 'este telemóvel' : 'esta conta'}. Obrigado por teres participado.</p>
       <a class="btn secundario" href="../">Voltar ao início</a></section>`;
   });
+}
+
+/** Questionário final: só com link em config.js e a partir do último dia do estudo. */
+function cartaoQuestionario(e) {
+  if (!CONFIG.questionario || !e?.hoje || e.hoje < CONFIG.estudo.fim) return '';
+  const grupo = e.coletivo ? 'coletivo' : e.pessoal ? 'pessoal' : 'sem-grupo';
+  const url = CONFIG.questionario.replaceAll('{grupo}', encodeURIComponent(grupo));
+  return `<section class="cartao aparecer" style="margin-bottom:14px">
+    <h2>O estudo terminou. Obrigado!</h2>
+    <p class="muted" style="margin:0 0 12px">Ajuda-nos a perceber como correu: são poucas perguntas e demora 1 minuto.</p>
+    <a class="btn" href="${url}" target="_blank" rel="noopener">Responder ao questionário</a>
+  </section>`;
 }
 
 /** Convite para criar conta (só para quem está sem conta). */
