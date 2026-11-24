@@ -1,7 +1,7 @@
-import { CONFIG } from '../../config.js?v=202611241533';
-import { rpc } from './api.js?v=202611241533';
-import * as ui from './ui.js?v=202611241533';
-import { metros, progressoRota } from './calc.js?v=202611241533';
+import { CONFIG } from '../../config.js?v=202611241544';
+import { rpc } from './api.js?v=202611241544';
+import * as ui from './ui.js?v=202611241544';
+import { metros, progressoRota } from './calc.js?v=202611241544';
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');

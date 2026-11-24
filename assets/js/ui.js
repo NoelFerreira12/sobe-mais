@@ -125,12 +125,12 @@ export function cartaoSemana(r) {
     `<button class="chip" data-meta="${n}" aria-pressed="${n === marcar}">${n}×</button>`).join('');
   let meta;
   if (!r.meta) {
-    meta = `<p class="muted" style="margin:0 0 10px">Meta opcional: quantas vezes por semana te comprometes a subir?</p>
+    meta = `<p class="muted" style="margin:0 0 10px">Quantas vezes queres subir por semana?</p>
       <div class="chips" role="group" aria-label="Meta semanal">${chips(null)}</div>`;
   } else {
     const feitos = Math.min(r.estaSemana, r.meta);
     const pontos = Array.from({ length: r.meta }, (_, i) => `<i class="${i < feitos ? 'cheio' : ''}"></i>`).join('');
-    const msg = r.estaSemana >= r.meta ? 'Meta cumprida. Palavra dada!' : `Faltam ${r.meta - r.estaSemana}. Ao teu ritmo.`;
+    const msg = r.estaSemana >= r.meta ? 'Meta cumprida!' : `Faltam ${r.meta - r.estaSemana}.`;
     meta = `<div class="semana-linha"><span>Meta: <strong>${r.meta}× por semana</strong></span>
         <span class="num" style="font-size:1.6rem">${r.estaSemana}/${r.meta}</span></div>
       <div class="pontos" aria-hidden="true">${pontos}</div>
@@ -141,9 +141,9 @@ export function cartaoSemana(r) {
       </details>`;
   }
   let seqTxt;
-  if (r.sequencia === 0) seqTxt = 'Sobe em semanas seguidas para começar. Podes falhar 1 semana sem perder.';
-  else if (r.emPausa) seqTxt = 'Semana de pausa: não faz mal. Sobe esta semana para manter.';
-  else seqTxt = 'Podes falhar 1 semana sem perder a sequência.';
+  if (r.sequencia === 0) seqTxt = 'Sobe em semanas seguidas.';
+  else if (r.emPausa) seqTxt = 'Sobe esta semana para não a perder.';
+  else seqTxt = 'Podes falhar 1 semana sem a perder.';
   return `<section class="cartao" id="meta">
     <h2>Esta semana</h2>
     ${meta}
@@ -179,26 +179,38 @@ export function cartaoHistorico(dias, hoje, { titulo, vazio, n = 14 } = {}) {
     const rotulo = `<text x="${cx}" y="${H - 6}" text-anchor="middle" class="hist-eixo${x.hoje ? ' hoje' : ''}">${x.hoje ? 'hoje' : letras[x.dia]}</text>`;
     return `<g><title>${x.d.slice(8, 10)}/${x.d.slice(5, 7)}: ${x.n} ${x.n === 1 ? 'subida' : 'subidas'}</title>${barra}${valor}${rotulo}</g>`;
   }).join('');
-  return `<section class="cartao">
-    <div class="semana-linha"><h2 style="margin:0">${titulo}</h2>
-      <span class="muted pequeno">${total} ${total === 1 ? 'subida' : 'subidas'} em ${n} dias</span></div>
+  // Fechado por defeito: abre-se com um toque.
+  return `<details class="cartao mais-metas historico-cartao">
+    <summary><span>${titulo}</span> <span class="muted" style="text-decoration:none;font-weight:600">
+      · ${total} em ${n} dias</span></summary>
     ${total ? `<svg class="historico" viewBox="0 0 ${W} ${H}" role="img"
       aria-label="${titulo}: ${total} subidas nos últimos ${n} dias">${barras}</svg>`
       : `<p class="muted" style="margin:10px 0 0">${vazio}</p>`}
+  </details>`;
+}
+
+const medalha = (m, novas) => `<div class="medalha ${m.ganha ? 'ganha' : ''} ${novas.has(m.id) ? 'nova' : ''}">
+    <div class="disco">${ICONES[m.icone]}</div>
+    <b>${m.nome}</b><small>${m.desc}</small>
+    <span class="sr">${m.ganha ? 'Conquistada' : 'Por conquistar'}</span>
+  </div>`;
+
+export function cartaoMedalhas(r, novas = new Set()) {
+  const ganhas = r.medalhas.filter((m) => m.ganha).length;
+  return `<section class="cartao">
+    <div class="semana-linha"><h2 style="margin:0">Medalhas</h2>
+      <span class="muted pequeno">${ganhas} de ${r.medalhas.length}</span></div>
+    <div class="medalhas" style="margin-top:12px">${r.medalhas.map((m) => medalha(m, novas)).join('')}</div>
   </section>`;
 }
 
-export function cartaoMedalhas(r, novas = new Set()) {
+/** Só as medalhas acabadas de ganhar (ecrã depois de uma leitura). */
+export function cartaoMedalhasNovas(r, novas = new Set()) {
+  const lista = r.medalhas.filter((m) => novas.has(m.id));
+  if (!lista.length) return '';
   return `<section class="cartao">
-    <h2>Medalhas</h2>
-    <p class="muted pequeno">Premiamos a regularidade, não a quantidade.</p>
-    <div class="medalhas">
-      ${r.medalhas.map((m) => `<div class="medalha ${m.ganha ? 'ganha' : ''} ${novas.has(m.id) ? 'nova' : ''}">
-        <div class="disco">${ICONES[m.icone]}</div>
-        <b>${m.nome}</b><small>${m.desc}</small>
-        <span class="sr">${m.ganha ? 'Conquistada' : 'Por conquistar'}</span>
-      </div>`).join('')}
-    </div>
+    <h2>${lista.length === 1 ? 'Medalha nova!' : 'Medalhas novas!'}</h2>
+    <div class="medalhas">${lista.map((m) => medalha(m, novas)).join('')}</div>
   </section>`;
 }
 

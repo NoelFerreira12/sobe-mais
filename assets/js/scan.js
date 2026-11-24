@@ -1,9 +1,9 @@
-import { CONFIG } from '../../config.js?v=202611241533';
-import { rpc } from './api.js?v=202611241533';
-import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js?v=202611241533';
-import { resumo, metros, metrosSubida, progressoRota } from './calc.js?v=202611241533';
-import * as ui from './ui.js?v=202611241533';
-import { lerQR } from './leitor.js?v=202611241533';
+import { CONFIG } from '../../config.js?v=202611241544';
+import { rpc } from './api.js?v=202611241544';
+import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js?v=202611241544';
+import { resumo, metros, metrosSubida, progressoRota } from './calc.js?v=202611241544';
+import * as ui from './ui.js?v=202611241544';
+import { lerQR } from './leitor.js?v=202611241544';
 
 const botaoLer = (txt = 'Ler QR do piso', cls = '') =>
   `<button class="btn ${cls}" type="button" data-ler>${ui.ICONES.qr}<span>${txt}</span></button>`;
@@ -88,11 +88,11 @@ function mostrarErroCamara(codigo) {
 // O token lido (se houver) fica à espera e é registado logo a seguir.
 // ---------------------------------------------------------------------
 const ERROS_CONTA = {
-  utilizador_invalido: 'O nome tem de ter 3 a 24 caracteres: letras minúsculas, números, ponto, hífen ou _.',
+  utilizador_invalido: 'A alcunha tem de ter 3 a 24 letras (sem acentos) ou números, sem espaços.',
   password_curta: 'A palavra-passe tem de ter pelo menos 6 caracteres.',
-  utilizador_existe: 'Esse nome já está a ser usado. Escolhe outro ou entra na tua conta.',
-  credenciais: 'Alcunha ou palavra-passe incorretas. Não tens a certeza da tua alcunha? Toca em «Esqueci-me» e usa só o teu código de recuperação.',
-  codigo_errado: 'Código de recuperação incorreto. Confirma o código (ou deixa a alcunha em branco e usa só o código).',
+  utilizador_existe: 'Essa alcunha já existe. Escolhe outra.',
+  credenciais: 'Alcunha ou palavra-passe erradas. Esqueceste-te? Toca em «Esqueci-me».',
+  codigo_errado: 'Código de recuperação errado.',
   bloqueado: 'Demasiadas tentativas falhadas. Espera 15 minutos.',
   muitas_contas: 'Muitas contas criadas agora mesmo. Tenta daqui a pouco.',
 };
@@ -102,11 +102,11 @@ const limpaNome = (s) => String(s || '').replace(/[^a-z0-9._-]/gi, '');
 function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = []) {
   const criar = modo === 'criar', recuperar = modo === 'recuperar';
   const titulo = recuperar ? 'Recuperar conta' : (token ? 'Quase lá!' : `Sobe<span style="color:var(--laranja)">+</span>`);
-  const sub = recuperar
-    ? 'Basta o código de recuperação que guardaste. Se não te lembras da alcunha, deixa-a em branco: dizemos-ta a seguir.'
-    : (token ? 'Entra ou cria uma conta. Também podes continuar sem conta.' : 'Entra ou cria uma conta para guardares o teu progresso.');
+  const sub = recuperar ? 'Usa o código de recuperação que guardaste.'
+    : (token ? 'Para esta subida contar, entra ou continua sem conta.' : 'Guarda o teu progresso com uma alcunha.');
+  const aceitar = 'Só guardamos um ID anónimo e a hora das leituras. Ao continuar aceitas os <a href="../termos/">Termos</a> e a <a href="../privacidade/">Privacidade</a>.';
   ecra.innerHTML = `
-    <div class="hero aparecer" style="padding-bottom:0"><div class="ilustracao" style="width:min(170px,50%)">${ui.MONTANHA}</div>
+    <div class="hero aparecer" style="padding-bottom:0"><div class="ilustracao" style="width:min(120px,36%)">${ui.MONTANHA}</div>
       <h1>${titulo}</h1><p>${sub}</p></div>
     <section class="cartao aparecer aparecer-2">
       ${recuperar ? '' : `<div class="separadores" role="tablist" aria-label="Conta">
@@ -115,10 +115,10 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = [
       </div>`}
       <form id="form-conta" class="pilha" novalidate>
         <div>
-          <label for="u"><strong>${recuperar ? 'Alcunha <span class="muted" style="font-weight:600">(opcional)</span>' : 'Nome de utilizador (alcunha)'}</strong></label>
+          <label for="u"><strong>Alcunha${recuperar ? ' <span class="muted" style="font-weight:600">(se te lembrares)</span>' : ''}</strong></label>
           <input type="text" id="u" name="username" autocomplete="username" autocapitalize="none" autocorrect="off"
-            spellcheck="false" minlength="3" maxlength="24" ${recuperar ? '' : 'required'} value="${limpaNome(nome)}">
-          ${criar ? '<p class="muted pequeno" style="margin:6px 0 0">Usa uma alcunha. Não uses o teu nome verdadeiro nem o número de aluno.</p>' : ''}
+            spellcheck="false" minlength="3" maxlength="24" ${recuperar ? '' : 'required'} value="${limpaNome(nome)}"
+            ${criar ? 'placeholder="ex.: gato_azul (não o teu nome)"' : ''}>
         </div>
         ${recuperar ? `<div>
           <label for="cod"><strong>Código de recuperação</strong></label>
@@ -127,31 +127,23 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = [
         </div>` : ''}
         <div>
           <label for="pw"><strong>${recuperar ? 'Nova palavra-passe' : 'Palavra-passe'}</strong></label>
-          <input type="password" id="pw" name="password" autocomplete="${criar || recuperar ? 'new-password' : 'current-password'}" minlength="6" maxlength="72" required>
-          ${criar ? '<p class="muted pequeno" style="margin:6px 0 0">Mínimo 6 caracteres. A seguir damos-te um código para recuperares a conta se a esqueceres.</p>' : ''}
+          <input type="password" id="pw" name="password" autocomplete="${criar || recuperar ? 'new-password' : 'current-password'}" minlength="6" maxlength="72" required
+            ${criar || recuperar ? 'placeholder="mínimo 6 caracteres"' : ''}>
         </div>
-        ${criar ? `<div class="aviso-caixa">
-          <p style="margin:0"><strong>Registamos um ID anónimo e a hora a que lês os QR, só para contar subidas.</strong></p>
-          <p class="pequeno" style="margin:6px 0 0">Sem email nem dados pessoais. Participar é voluntário e podes apagar tudo quando quiseres.
-            Ao continuar aceitas os <a href="../termos/">Termos</a> e a <a href="../privacidade/">Privacidade</a>.</p>
-        </div>` : ''}
         ${erro ? `<div class="aviso-caixa" role="alert"><p style="margin:0">${erro}</p>
-          ${sugestoes.length ? `<p class="pequeno" style="margin:8px 0 6px">Nomes livres (toca para usar):</p>
+          ${sugestoes.length ? `<p class="pequeno" style="margin:8px 0 6px">Livres (toca para usar):</p>
           <div class="chips">${sugestoes.map((s) => limpaNome(s)).map((s) => `<button type="button" class="chip" data-sugestao="${s}">${s}</button>`).join('')}</div>` : ''}
         </div>` : ''}
-        <button class="btn" type="submit">${criar ? 'Aceitar e criar conta' : recuperar ? 'Mudar palavra-passe e entrar' : 'Entrar'}</button>
+        <button class="btn" type="submit">${criar ? 'Criar conta' : recuperar ? 'Mudar palavra-passe e entrar' : 'Entrar'}</button>
+        ${criar ? `<p class="muted pequeno" style="margin:0">${aceitar}</p>` : ''}
         ${modo === 'entrar' ? '<p class="centro" style="margin:0"><button type="button" class="ligacao-btn" data-modo="recuperar">Esqueci-me da palavra-passe</button></p>' : ''}
         ${recuperar ? '<p class="centro" style="margin:0"><button type="button" class="ligacao-btn" data-modo="entrar">Voltar a entrar</button></p>' : ''}
       </form>
     </section>
-    ${recuperar ? '' : `<section class="cartao aparecer aparecer-3" style="margin-top:14px">
-      <h2>Sem conta?</h2>
-      <p class="muted" style="margin:0 0 8px">Sobe na mesma, sem conta. Só não dá para usar o teu progresso noutro telemóvel
-        nem recuperá-lo se mudares de telemóvel. Podes criar conta mais tarde e não perdes nada.</p>
-      <p class="pequeno" style="margin:0 0 12px"><strong>Registamos um ID anónimo e a hora a que lês os QR, só para contar subidas.</strong>
-        <a href="../privacidade/">Privacidade</a></p>
+    ${recuperar ? '' : `<div class="pilha aparecer aparecer-3" style="margin-top:14px">
       <button class="btn secundario" type="button" id="sem-conta">Continuar sem conta</button>
-    </section>`}`;
+      <p class="muted pequeno centro" style="margin:0">Podes criar conta depois. ${criar ? '' : aceitar}</p>
+    </div>`}`;
 
   ecra.querySelectorAll('[data-modo]').forEach((b) => b.addEventListener('click', () => {
     mostrarConta(token, b.dataset.modo, '', document.getElementById('u').value);
@@ -187,7 +179,7 @@ function mostrarConta(token, modo = 'criar', erro = '', nome = '', sugestoes = [
     }
     if (!r.ok) {
       const msg = r.erro === 'utilizador_existe' && criar
-        ? `A alcunha «${limpaNome(u)}» já é de outra pessoa. Cada alcunha é única: escolhe outra.`
+        ? `A alcunha «${limpaNome(u)}» já existe. Escolhe outra.`
         : (ERROS_CONTA[r.erro] ?? 'Algo correu mal. Tenta outra vez.');
       return mostrarConta(token, modo, msg, u, r.sugestoes || []);
     }
@@ -206,8 +198,7 @@ function mostrarCodigo(codigo, seguir, novo = false, alcunha = '') {
   ecra.innerHTML = `
     <section class="cartao aparecer">
       <h1>${novo ? 'Palavra-passe mudada' : 'Conta criada!'}</h1>
-      <p>Guarda estes dois dados: tira um print ou copia-os para as tuas notas.
-        Se te esqueceres da palavra-passe (ou da alcunha), é com o código que voltas a entrar.</p>
+      <p>Tira um print. Se te esqueceres da palavra-passe, entras com este código.</p>
       <p class="etiqueta" style="margin:14px 0 4px">A tua alcunha</p>
       <div class="codigo-rec" style="margin-top:0;border-style:solid;font-size:1.4rem" id="alcunha">${nome}</div>
       <p class="etiqueta" style="margin:14px 0 4px">${novo ? 'Novo código' : 'Código'} de recuperação</p>
@@ -216,7 +207,7 @@ function mostrarCodigo(codigo, seguir, novo = false, alcunha = '') {
         <button class="btn secundario" type="button" id="copiar">Copiar alcunha e código</button>
         <button class="btn" type="button" id="guardei">Já guardei, continuar</button>
       </div>
-      <p class="muted pequeno" style="margin:12px 0 0">Não o mostramos outra vez. Com a sessão iniciada podes gerar um novo no ecrã do teu progresso.</p>
+      <p class="muted pequeno" style="margin:12px 0 0">Não o mostramos outra vez.</p>
     </section>`;
   document.getElementById('copiar').addEventListener('click', async (ev) => {
     try {
@@ -317,11 +308,11 @@ function textoResultado(r) {
     titulo: `Começaste no ${P(r.piso)}!`, texto: 'Sobe e lê o QR quando chegares.', extra });
   switch (r.resultado) {
     case 'inicio':
-      return comeco('Ao teu ritmo: não há pressa nenhuma.');
+      return comeco('');
     case 'descer':
-      return comeco(`Descer não conta, mas boa caminhada! A leitura anterior (${P(r.piso_origem)}) ficou sem subida.`);
+      return comeco('Descer não conta, mas boa caminhada!');
     case 'lento':
-      return comeco(`Passou muito tempo desde a leitura no ${P(r.piso_origem)}, por isso começas outra vez a partir deste piso.`);
+      return comeco('Passou muito tempo desde a última leitura, por isso começas aqui.');
     case 'valida':
       return { cls: 'ok', icone: 'check', titulo: 'Subida registada!',
         grande: `+${r.andares} ${r.andares === 1 ? 'andar' : 'andares'}`,
@@ -335,14 +326,13 @@ function textoResultado(r) {
     }
     case 'rapido':
       return { cls: 'aviso', icone: 'relogio', titulo: 'Foste rápido demais', partida: !noTopo,
-        texto: `Para contar, ${r.andares} ${r.andares === 1 ? 'andar tem' : 'andares têm'} de demorar pelo menos ${ui.duracao(r.min_seg)}. Sobe com calma, ao teu ritmo.`,
-        extra: noTopo ? 'Para a próxima subida, lê o QR do piso onde começares.'
-          : `Começas outra vez a partir do ${P(r.piso)}: sobe e lê o QR quando chegares.` };
+        texto: `Para contar, ${r.andares === 1 ? '1 andar tem' : `${r.andares} andares têm`} de levar pelo menos ${ui.duracao(r.min_seg)}. Sobe com calma.`,
+        extra: noTopo ? '' : `Começas outra vez no ${P(r.piso)}.` };
     case 'cooldown': {
       const min = Math.max(1, Math.ceil((r.cooldown_restante_seg ?? 60) / 60));
       return { cls: 'aviso', icone: 'pausa', titulo: 'Já contámos uma subida há pouco', partida: !noTopo,
-        texto: `As subidas voltam a contar daqui a cerca de ${min} min.`,
-        extra: noTopo ? '' : `O ${P(r.piso)} fica como ponto de partida.` };
+        texto: `Volta a contar daqui a ${min} min.`,
+        extra: noTopo ? '' : `Começas no ${P(r.piso)}.` };
     }
     case 'repetido': {
       const u = r.estado?.ultimo_scan;
@@ -375,10 +365,12 @@ function mostrarResultado(r) {
     <div class="aparecer" style="margin-top:14px">${t.partida
       ? botaoLer('Ler o QR quando chegares')
       : botaoLer('Ler o próximo QR', 'secundario')}</div>
-    ${valida && r.conta === false ? cartaoSemConta('A tua subida já conta.') : ''}
-    <div id="perfil" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>`;
+    <div id="perfil" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>
+    ${valida && r.conta === false ? cartaoSemConta() : ''}
+    <p class="centro" style="margin-top:16px"><a href="./">Ver o meu progresso</a></p>`;
   // Depois de uma subida válida, a rota anima desde o valor anterior.
-  desenharPerfil(valida ? metrosSubida(r.piso_origem, r.piso) : 0, valida);
+  // Aqui só a rota (e medalhas novas); o resto fica no ecrã do progresso.
+  desenharPerfil(valida ? metrosSubida(r.piso_origem, r.piso) : 0, valida, { completo: false });
   if (r.resultado === 'valida') {
     ui.vibrar();
     setTimeout(ui.confettis, 250);
@@ -408,21 +400,17 @@ async function mostrarEstado() {
   const u = estadoAtual.ultimo_scan;
   const janela = estadoAtual.janela_seg ?? CONFIG.maxSegPorAndar * (TOPO - Math.min(...CONFIG.pisos));
   const emCurso = u && u.piso < TOPO && u.segundos_desde <= janela;
-  const aviso = emCurso
-    ? `<span class="etiqueta">Ponto de partida</span>
-       <h2 style="margin:6px 0">${ui.nomePiso(u.piso)}</h2>
-       <p style="margin:0">Leste este QR há ${ui.duracao(u.segundos_desde)}. Sobe e lê o QR quando chegares.</p>
-       <p class="muted pequeno" style="margin:6px 0 0">Mudaste de ideias? Não faz mal: lê o QR do piso onde estiveres e começas uma subida nova.</p>`
-    : `<h2>Pronto para subir?</h2><p style="margin:0">Lê o QR do piso onde estás para começar uma subida.</p>`;
   const nome = limpaNome(estadoAtual.utilizador);
   ecra.innerHTML = `
     ${convidado ? '' : `<p class="ola aparecer">Olá, <strong>${nome}</strong></p>`}
     ${cartaoQuestionario(estadoAtual)}
-    <section class="cartao destaque aparecer">${aviso}</section>
-    <div class="aparecer" style="margin-top:14px">${botaoLer()}</div>
-    ${convidado ? cartaoSemConta('As tuas subidas contam na mesma.') : ''}
+    ${emCurso ? `<section class="cartao destaque aparecer" style="margin-bottom:14px">
+       <h2 style="margin:0 0 4px">Começaste no ${ui.nomePiso(u.piso)}</h2>
+       <p style="margin:0">Sobe e lê o QR quando chegares.</p></section>` : ''}
+    <div class="aparecer">${botaoLer(emCurso ? 'Ler o QR onde chegaste' : 'Ler QR do piso')}</div>
+    ${emCurso ? '' : '<p class="muted centro pequeno" style="margin:8px 0 0">Lê o QR do piso onde estás para começar.</p>'}
+    ${convidado ? cartaoSemConta() : ''}
     <div id="perfil" class="pilha aparecer aparecer-2" style="margin-top:14px"></div>
-    <p class="muted centro pequeno" style="margin-top:18px">${ui.fraseComparacao(CONFIG)}</p>
     <details class="cartao mais-metas" style="margin-top:14px;padding:14px 20px">
       <summary><span>${convidado ? 'Os meus dados' : 'A minha conta'}</span></summary>
       <div class="pilha" style="margin-top:12px">
@@ -521,12 +509,10 @@ function cartaoQuestionario(e) {
 }
 
 /** Convite para criar conta (só para quem está sem conta). */
-function cartaoSemConta(frase) {
+function cartaoSemConta() {
   return `<section class="cartao aparecer aparecer-2" style="margin-top:14px">
-    <h2>Estás sem conta</h2>
-    <p class="muted" style="margin:0 0 12px">${frase} Com uma conta (só alcunha e palavra-passe) guardas o teu progresso
-      e podes usá-lo noutro telemóvel. Se a criares neste telemóvel, não perdes nada do que já fizeste.</p>
-    <button class="btn secundario" type="button" data-conta>Criar conta ou entrar</button>
+    <p style="margin:0 0 10px"><strong>Estás sem conta.</strong> Cria uma para não perderes o progresso se mudares de telemóvel.</p>
+    <button class="btn secundario pequeno" type="button" data-conta>Criar conta</button>
   </section>`;
 }
 
@@ -546,15 +532,13 @@ function blocoRota(rota, total, estaSubidaM, { sujeito, chegou, extra = '' }) {
     const cls = m.altitude <= p.atual ? 'feito' : (m === p.proximo ? 'proximo' : '');
     return `<li class="${cls}"><span>${m.nome}</span><span class="num" style="font-weight:700">${ui.fmt(m.altitude)} m</span></li>`;
   }).join('');
-  const proximoTxt = p.proximo === topo
-    ? `Próxima meta: <strong>${topo.nome}</strong>, o topo. Faltam <strong>${ui.fmt(p.falta, 1)} m</strong>.`
-    : `Próxima meta: <strong>${p.proximo.nome}</strong> (${ui.fmt(p.proximo.altitude)} m). Faltam <strong>${ui.fmt(p.falta, 1)} m</strong>.`;
+  const proximoTxt = `Próxima meta: <strong>${p.proximo.nome}</strong> · faltam ${ui.fmt(p.falta, 1)} m`;
   const bandeira = ui.ICONES.bandeira.replace('<svg', '<svg width="18" height="18"');
   return `
     <span class="etiqueta">${rota.titulo}</span>
     ${chegouAoTopo ? `<p style="margin:10px 0 4px"><span class="selo">${bandeira} ${chegou(topo.nome)}</span></p>` : ''}
     ${marcoNovo ? `<p style="margin:10px 0 4px"><span class="selo">${bandeira} ${sujeito} ${marcoNovo.nome}!</span></p>` : ''}
-    ${p.voltas >= 1 ? `<p style="margin:8px 0 0"><strong>${p.subidaN}.ª subida ao ${topo.nome}.</strong> A contagem recomeçou.</p>` : ''}
+    ${p.voltas >= 1 ? `<p style="margin:8px 0 0"><strong>${p.subidaN}.ª subida ao ${topo.nome}</strong></p>` : ''}
     <div style="margin:10px 0 12px"><span class="metros-grande num" data-contar="${p.atual}" data-casas="1">0</span>
       <span class="muted"> m de ${ui.fmt(topo.altitude)} m</span></div>
     <div class="barra" role="progressbar" aria-label="${rota.titulo}"
@@ -564,7 +548,7 @@ function blocoRota(rota, total, estaSubidaM, { sujeito, chegou, extra = '' }) {
     <p style="margin:0 0 6px">${proximoTxt}</p>
     ${extra}
     <details class="mais-metas" style="margin-top:8px">
-      <summary><span>Ver todas as metas</span> <span class="muted" style="text-decoration:none;font-weight:600">
+      <summary><span>Todas as metas</span> <span class="muted" style="text-decoration:none;font-weight:600">
         (${p.marcos.filter((m) => m.altitude <= p.atual).length} de ${p.marcos.length})</span></summary>
       <ul class="lista-marcos">${lista}</ul>
     </details>`;
@@ -574,7 +558,7 @@ function blocoRota(rota, total, estaSubidaM, { sujeito, chegou, extra = '' }) {
 function cartaoColetivo(c, estaSubidaM, aposSubida) {
   const total = metros(c.lancos);
   const quem = `${ui.fmt(c.subidas)} ${c.subidas === 1 ? 'subida' : 'subidas'} de ${ui.fmt(c.pessoas)} ${c.pessoas === 1 ? 'pessoa' : 'pessoas'} da UMa`;
-  const extra = `<p class="muted pequeno" style="margin:0">${aposSubida ? `A tua subida juntou-se a ${quem}` : `Até agora: ${quem}`}: ${ui.fmt(total, 1)} m no total.</p>`;
+  const extra = `<p class="muted pequeno" style="margin:0">${aposSubida ? `A tua subida juntou-se a ${quem}.` : `Até agora: ${quem}.`}</p>`;
   return `<section class="cartao destaque" data-variante-ecra="A">
     ${blocoRota(CONFIG.rotaColetiva, total, estaSubidaM, {
       sujeito: 'A UMa chegou ao', chegou: (n) => `Chegámos ao ${n}!`, extra })}
@@ -584,11 +568,8 @@ function cartaoColetivo(c, estaSubidaM, aposSubida) {
 // Versão B — objetivo INDIVIDUAL: só os metros da própria pessoa.
 function cartaoPessoal(pe, estaSubidaM) {
   const m = metros(pe.lancos);
-  const extra = `<div class="numeros" style="margin:14px 0 4px">
-      <div><div class="valor num" data-contar="${pe.subidas}">0</div><div class="rotulo">${pe.subidas === 1 ? 'subida' : 'subidas'}</div></div>
-      <div><div class="valor num" data-contar="${pe.andares}">0</div><div class="rotulo">${pe.andares === 1 ? 'andar' : 'andares'}</div></div>
-      <div><div class="valor num" data-contar="${m}" data-casas="1">0</div><div class="rotulo">${m === 1 ? 'metro' : 'metros'}</div></div>
-    </div>`;
+  const extra = `<p class="muted pequeno" style="margin:0">Até agora: ${ui.fmt(pe.subidas)} ${pe.subidas === 1 ? 'subida tua' : 'subidas tuas'},
+    ${ui.fmt(pe.andares)} ${pe.andares === 1 ? 'andar' : 'andares'}.</p>`;
   return `<section class="cartao destaque" data-variante-ecra="B">
     ${blocoRota(CONFIG.rotaIndividual, m, estaSubidaM, {
       sujeito: 'Chegaste ao', chegou: (n) => `Chegaste ao ${n}!`, extra })}
@@ -600,25 +581,27 @@ function cartaoPessoal(pe, estaSubidaM) {
 // Rota e histórico seguem o grupo: A -> UMa; B -> pessoal (com ou sem conta).
 // Sem grupo ainda (sem conta, antes da 1.ª leitura): nada do grupo, para não influenciar.
 // ---------------------------------------------------------------------
-function desenharPerfil(estaSubidaM = 0, aposSubida = false, { animado = true } = {}) {
+function desenharPerfil(estaSubidaM = 0, aposSubida = false, { animado = true, completo = true } = {}) {
   const alvo = document.getElementById('perfil');
   if (!alvo || !estadoAtual) return;
   const e = estadoAtual;
   let html = '';
   if (!e.coletivo && !e.pessoal) {
     html += `<section class="cartao destaque"><span class="etiqueta">A tua rota pela Madeira</span>
-      <p style="margin:8px 0 0">Aparece depois da tua primeira leitura, com metas como a Fortaleza do Pico e o Cabo Girão.</p></section>`;
+      <p style="margin:8px 0 0">Aparece depois da primeira leitura.</p></section>`;
   } else if (e.coletivo) {
     html += cartaoColetivo(e.coletivo, estaSubidaM, aposSubida);
-    html += ui.cartaoHistorico(e.coletivo.dias, e.coletivo.hoje || e.hoje, {
-      titulo: 'Subidas da UMa', vazio: 'Ainda ninguém subiu nestes dias. Sê o primeiro!' });
+    if (completo) html += ui.cartaoHistorico(e.coletivo.dias, e.coletivo.hoje || e.hoje, {
+      titulo: 'Subidas da UMa', vazio: 'Ainda ninguém subiu nestes dias.' });
   } else if (e.pessoal) {
     html += cartaoPessoal(e.pessoal, estaSubidaM);
-    html += ui.cartaoHistorico(e.dias, e.hoje, {
-      titulo: 'As tuas subidas', vazio: 'Ainda sem subidas nestes dias. A primeira está à distância de um QR.' });
+    if (completo) html += ui.cartaoHistorico(e.dias, e.hoje, {
+      titulo: 'As tuas subidas', vazio: 'Ainda sem subidas nestes dias.' });
   }
   const r = resumo(e);
-  html += ui.cartaoSemana(r) + ui.cartaoMedalhas(r, ui.medalhasNovas(r));
+  const novas = ui.medalhasNovas(r);
+  // Depois de uma leitura: só as medalhas acabadas de ganhar. No progresso: tudo.
+  html += completo ? ui.cartaoSemana(r) + ui.cartaoMedalhas(r, novas) : ui.cartaoMedalhasNovas(r, novas);
   alvo.innerHTML = html;
   animar(alvo, animado);
 }

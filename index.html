@@ -36,30 +36,29 @@
       <section class="cartao aparecer aparecer-3">
         <h2>Como funciona</h2>
         <ol class="passos">
-          <li><strong>Lê o QR do piso onde estás</strong>, com o botão acima ou com a câmara do telemóvel.</li>
+          <li><strong>Lê o QR do piso onde estás.</strong></li>
           <li><strong>Sobe pela escada</strong>, ao teu ritmo.</li>
-          <li><strong>Lê o QR do piso onde chegas.</strong> A subida conta e ganhas metas numa rota pela Madeira.</li>
+          <li><strong>Lê o QR do piso onde chegas.</strong> Está feito!</li>
         </ol>
-        <p class="muted pequeno" style="margin:0">Há um QR em cada piso, do -3 ao 3. Descer não conta.
-          Com conta guardas o teu progresso, mas também podes participar sem conta.</p>
+        <p class="muted pequeno" style="margin:0">Há um QR em cada piso. Descer não conta.</p>
       </section>
 
       <section class="cartao aparecer aparecer-3" id="etica">
-        <h2>Sem pressão, sem dados pessoais</h2>
+        <h2>Sem pressão</h2>
         <ul class="lista-simples">
-          <li>Participar é voluntário e podes parar quando quiseres.</li>
-          <li>Não pedimos nome, email, número de aluno, localização nem dados de saúde.</li>
-          <li>Se precisas do elevador, usa-o sem hesitar. Não há rankings individuais.</li>
+          <li>É voluntário. Podes parar quando quiseres.</li>
+          <li>Não pedimos nome, email nem número de aluno.</li>
+          <li>Se precisas do elevador, usa-o.</li>
         </ul>
-        <p class="muted pequeno" style="margin:10px 0 0">Estudo de Persuasive Computing da UMa, de 13 de novembro a 8 de dezembro.</p>
+        <p class="muted pequeno" style="margin:10px 0 0">Estudo da UMa, de 13 de novembro a 8 de dezembro.</p>
       </section>
     </main>
     <div id="rodape"></div>
   </div>
   <script type="module">
-    import { CONFIG } from './config.js?v=202611241533';
-    import * as ui from './assets/js/ui.js?v=202611241533';
-    import { lerId, lerNome } from './assets/js/id.js?v=202611241533';
+    import { CONFIG } from './config.js?v=202611241544';
+    import * as ui from './assets/js/ui.js?v=202611241544';
+    import { lerId, lerNome } from './assets/js/id.js?v=202611241544';
 
     document.getElementById('topo').innerHTML = ui.cabecalho('');
     document.getElementById('rodape').innerHTML = ui.rodape('');
