@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/app.css?v=202611241601">
+  <link rel="stylesheet" href="../assets/css/app.css?v=202611241645">
   <style>
     /* Cores só do painel: neutro (total, percursos, inícios) e estados da qualidade dos dados. */
     /* Validadas (daltonismo e visão normal) na ordem em que se tocam: Subida | Início | Rejeitada. */
@@ -136,6 +136,16 @@
 
     .metros-grande { font-size: 2.4rem; font-weight: 800; letter-spacing: -.03em; }
 
+    /* Registar subida esquecida */
+    .form-manual { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); align-items: end; }
+    .form-manual label { margin: 0; font-weight: 700; font-size: .85rem; color: var(--texto-2); display: grid; gap: 4px; }
+    .form-manual input, .form-manual select {
+      width: 100%; min-height: 46px; padding: 8px 12px; border-radius: 12px; border: 2px solid var(--borda);
+      background: var(--superficie); color: var(--texto); font: 600 1rem var(--fonte);
+    }
+    .form-manual .btn { width: 100%; }
+    .ok-caixa { padding: 14px 16px; border-radius: var(--raio-p); background: var(--ok-suave); color: var(--texto); }
+
     @media (max-width: 600px) {
       .app.largo { padding: 0 16px 40px; }
       .dash { gap: 12px; }
@@ -152,6 +162,6 @@
     <div id="topo"></div>
     <main id="ecra" class="pilha"></main>
   </div>
-  <script type="module" src="../assets/js/painel.js?v=202611241601"></script>
+  <script type="module" src="../assets/js/painel.js?v=202611241645"></script>
 </body>
 </html>
