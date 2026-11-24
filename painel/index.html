@@ -9,42 +9,142 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/app.css?v=202611241544">
+  <link rel="stylesheet" href="../assets/css/app.css?v=202611241601">
   <style>
-    .app.largo { max-width: 980px; }
-    .grelha { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-    .kpi .valor { font-size: 2.4rem; line-height: 1.05; }
-    .kpi .rotulo { color: var(--texto-2); font-size: .9rem; font-weight: 600; }
-    table { width: 100%; border-collapse: collapse; font-size: .95rem; }
-    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--borda); vertical-align: top; }
-    th { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--texto-2); }
-    td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .tabela-scroll { overflow-x: auto; }
-    .legenda { display: flex; gap: 18px; flex-wrap: wrap; font-size: .9rem; color: var(--texto-2); margin-bottom: 8px; }
-    .legenda span { display: inline-flex; align-items: center; gap: 6px; }
-    .legenda i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-    .grafico { position: relative; }
-    .grafico svg { width: 100%; height: auto; overflow: visible; }
-    .grafico .eixo { fill: var(--texto-2); font: 600 11px var(--fonte); }
-    .grafico .grade { stroke: var(--borda); stroke-width: 1; }
-    .grafico .alvo-hover { fill: transparent; }
-    .grafico .alvo-hover:hover, .grafico .alvo-hover.ativo { fill: var(--superficie-2); }
-    .dica {
-      position: absolute; pointer-events: none; background: var(--superficie); color: var(--texto);
-      border: 1px solid var(--borda); box-shadow: var(--sombra); border-radius: 12px; padding: 8px 12px;
-      font-size: .85rem; white-space: nowrap; transform: translate(-50%, -110%); display: none;
+    /* Cores só do painel: neutro (total, percursos, inícios) e estados da qualidade dos dados. */
+    /* Validadas (daltonismo e visão normal) na ordem em que se tocam: Subida | Início | Rejeitada. */
+    :root {
+      --neutro: #CFC6BD; --neutro-t: #1F1B18;
+      --seg-ok: #1D7347; --seg-ok-t: #FFFFFF;
+      --seg-rej: #B7791F; --seg-rej-t: #1F1B18;
+      --neutro-forte: var(--texto-2); /* linha do total, percursos */
     }
-    .dica i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 6px; }
-    .botoes { display: flex; gap: 10px; flex-wrap: wrap; }
-    .barra.alvo > span { transition-duration: .8s; }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --neutro: #575049; --neutro-t: #FFFFFF;
+        --seg-ok: #3FAF78; --seg-ok-t: #0E1F16;
+        --seg-rej: #E0A93B; --seg-rej-t: #241A06;
+      }
+    }
+
+    body { font-size: 15px; }
+    .app.largo { max-width: 1320px; padding: 0 20px 48px; }
     .h1 { font-weight: 800; }
     .nota { font-size: .85rem; color: var(--texto-2); }
-    i.cor { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 6px; }
-    .duelo { display: flex; gap: 32px; flex-wrap: wrap; font-weight: 700; color: var(--texto-2); }
-    .duelo .num { font-size: 2.4rem; color: var(--texto); margin-left: 4px; }
-    .mais-opcoes summary { cursor: pointer; }
-    .opcao { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
-    .opcao input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--laranja); flex: none; }
+    .botoes { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* Grelha: 12 colunas no computador, 1 coluna no telemóvel */
+    .dash { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; transition: opacity .2s; }
+    .dash.a-atualizar { opacity: .55; pointer-events: none; }
+    .dash > * { grid-column: 1 / -1; min-width: 0; margin: 0 !important; }
+    @media (min-width: 980px) {
+      .dash > .s5 { grid-column: span 5; }
+      .dash > .s6 { grid-column: span 6; }
+      .dash > .s7 { grid-column: span 7; }
+    }
+    .dash .cartao { padding: 18px 20px; border-radius: 18px; }
+    .dash h2 { font-size: 1.1rem; margin: 0 0 2px; }
+    .sub { color: var(--texto-2); font-size: .88rem; margin: 0 0 12px; }
+
+    .cabeca-painel { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 4px; }
+    .cabeca-painel h1 { margin: 0; font-size: 1.8rem; }
+
+    .filtros { display: flex; flex-wrap: wrap; gap: 8px; }
+    .filtro {
+      display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 8px 14px; border-radius: 999px;
+      background: var(--superficie); border: 1px solid var(--borda); cursor: pointer; font-weight: 600; font-size: .9rem;
+    }
+    .filtro input { width: 18px; height: 18px; margin: 0; accent-color: var(--laranja); }
+    .filtro:has(input:checked) { border-color: var(--laranja); background: var(--laranja-suave); }
+
+    /* Números principais */
+    .kpis { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+    .kpi .rotulo { color: var(--texto-2); font-size: .85rem; font-weight: 600; }
+    .kpi .valor { font-size: 2.1rem; font-weight: 800; line-height: 1.1; letter-spacing: -.03em; margin: 4px 0 2px; }
+    .kpi .valor .de { font-size: 1rem; color: var(--texto-2); font-weight: 700; letter-spacing: 0; }
+    .medidor { height: 8px; border-radius: 999px; background: var(--superficie-2); margin: 8px 0 6px; overflow: hidden; }
+    .medidor span { display: block; height: 100%; border-radius: 999px; background: var(--laranja); }
+
+    /* H1 */
+    .duelo { display: flex; gap: 12px 40px; flex-wrap: wrap; margin: 4px 0 6px; }
+    .duelo > div { display: flex; flex-direction: column; }
+    .duelo .chave { font-size: .85rem; color: var(--texto-2); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+    .duelo .chave i { width: 10px; height: 10px; border-radius: 50%; }
+    .duelo .valor { font-size: 2.6rem; font-weight: 800; line-height: 1.05; letter-spacing: -.03em; }
+    .veredito { margin: 4px 0 10px; }
+
+    /* Tabelas */
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--borda); vertical-align: top; }
+    th { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--texto-2); white-space: nowrap; }
+    td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .tabela-scroll { overflow-x: auto; }
+    .chave-cor { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+
+    /* Gráficos */
+    .titulo-linha { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; margin-bottom: 10px; }
+    .titulo-linha h2 { margin: 0; }
+    .legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: .85rem; color: var(--texto-2); }
+    .legenda span { display: inline-flex; align-items: center; gap: 6px; }
+    .legenda i { display: inline-block; }
+    .legenda i.barra { width: 12px; height: 12px; border-radius: 3px; }
+    .legenda i.linha { width: 16px; height: 2px; border-radius: 2px; }
+    .grafico { position: relative; min-height: 40px; }
+    .grafico svg { display: block; max-width: none; overflow: visible; }
+    .grafico .eixo { fill: var(--texto-2); font: 600 11px var(--fonte); font-variant-numeric: tabular-nums; }
+    .grafico .rot { fill: var(--texto); font: 800 14px var(--fonte); }
+    .grafico .grade { stroke: var(--borda); stroke-width: 1; }
+    .grafico .faixa { fill: transparent; }
+    .grafico .alvo.ativo .faixa { fill: var(--superficie-2); }
+    .grafico .mira { stroke: var(--texto-2); stroke-width: 1; opacity: 0; }
+    .grafico .alvo.ativo .mira { opacity: .7; }
+    .grafico .alvo.ativo .ponto { r: 6; }
+    .vazio { margin: 8px 0; }
+    details.vista, details.como { margin-top: 8px; }
+    details.vista summary, details.como summary { cursor: pointer; color: var(--laranja-texto); font-weight: 700; font-size: .88rem; padding: 4px 0; width: fit-content; }
+    .como ul { margin: 8px 0 0; padding-left: 1.2em; }
+    .como li + li { margin-top: 4px; }
+
+    .dica {
+      position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none;
+      background: var(--superficie); color: var(--texto); border: 1px solid var(--borda); box-shadow: var(--sombra);
+      border-radius: 12px; padding: 8px 12px; font-size: .85rem; line-height: 1.5; white-space: nowrap;
+    }
+    .dica[hidden] { display: none; }
+    .dica-titulo { color: var(--texto-2); font-weight: 600; }
+    .dica i { display: inline-block; width: 12px; height: 2px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+    .dica b { font-weight: 800; }
+
+    /* Barras segmentadas (qualidade) */
+    .seg-lista { display: grid; gap: 12px; }
+    .seg-linha { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 12px; align-items: center; }
+    .seg-rot { font-weight: 700; font-size: .9rem; display: flex; flex-direction: column; line-height: 1.25; }
+    .seg-rot .nota { font-weight: 500; }
+    .seg { display: flex; gap: 2px; height: 28px; }
+    .seg > span { border-radius: 4px; display: flex; align-items: center; padding: 0 8px; font-size: .8rem; font-weight: 700; min-width: 0; white-space: nowrap; }
+    .seg > span.ativo { filter: brightness(1.08); }
+    .seg-vazio { flex: 1; background: var(--superficie-2); }
+
+    /* Barras horizontais (percursos) */
+    .hbarras { display: grid; gap: 8px; }
+    .hb { display: grid; grid-template-columns: 104px minmax(0, 1fr) 36px; gap: 10px; align-items: center; font-size: .9rem; }
+    .hb-rot { font-weight: 600; white-space: nowrap; }
+    .hb-trilho { height: 14px; }
+    .hb-trilho span { display: block; height: 100%; min-width: 2px; background: var(--neutro-forte); border-radius: 0 4px 4px 0; }
+    .hb.ativo .hb-trilho span { filter: brightness(1.08); }
+    .hb-val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    .metros-grande { font-size: 2.4rem; font-weight: 800; letter-spacing: -.03em; }
+
+    @media (max-width: 600px) {
+      .app.largo { padding: 0 16px 40px; }
+      .dash { gap: 12px; }
+      .dash .cartao { padding: 16px; }
+      .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .kpi .valor { font-size: 1.7rem; }
+      .seg-linha { grid-template-columns: 1fr; gap: 6px; }
+      .seg-rot { flex-direction: row; gap: 8px; align-items: baseline; }
+    }
   </style>
 </head>
 <body>
@@ -52,6 +152,6 @@
     <div id="topo"></div>
     <main id="ecra" class="pilha"></main>
   </div>
-  <script type="module" src="../assets/js/painel.js?v=202611241544"></script>
+  <script type="module" src="../assets/js/painel.js?v=202611241601"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
-import { CONFIG } from '../../config.js?v=202611241544';
-import { rpc } from './api.js?v=202611241544';
-import * as ui from './ui.js?v=202611241544';
-import { metros, progressoRota } from './calc.js?v=202611241544';
+import { CONFIG } from '../../config.js?v=202611241601';
+import { rpc } from './api.js?v=202611241601';
+import * as ui from './ui.js?v=202611241601';
+import { metros, progressoRota } from './calc.js?v=202611241601';
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
@@ -11,10 +11,15 @@ const comTestes = () => { try { return sessionStorage.getItem(CHAVE_TESTES) === 
 const CHAVE_EX = 'sobe_painel_sem_ex';
 const excluirEx = () => { try { return sessionStorage.getItem(CHAVE_EX) === '1'; } catch { return false; } };
 
+// Uma só caixa de dica para todos os gráficos.
+const dica = Object.assign(document.createElement('div'), { className: 'dica', hidden: true, role: 'tooltip' });
+document.body.appendChild(dica);
+
 // ---------------------------------------------------------------------
 // Estatística
 // ---------------------------------------------------------------------
-const media = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN);
+const soma = (a) => a.reduce((s, x) => s + x, 0);
+const media = (a) => (a.length ? soma(a) / a.length : NaN);
 function mediana(a) {
   if (!a.length) return NaN;
   const s = [...a].sort((x, y) => x - y), m = s.length >> 1;
@@ -75,10 +80,28 @@ function caudaExata(ordens2, k, obs) {
   return cauda / total;
 }
 
+/** Tamanho do efeito: correlação rank-biserial a partir do U (+1 = todos os A acima de todos os B). */
+const efeito = (r, n1, n2) => (r ? (2 * r.U) / (n1 * n2) - 1 : NaN);
+const teste = (a, b) => { const r = mannWhitney(a, b); return { r, ef: efeito(r, a.length, b.length) }; };
+
+/** Fisher exato unilateral (proporção de A > proporção de B). */
+function fisher(a1, n1, b1, n2) {
+  if (n1 < 2 || n2 < 2) return null;
+  const lf = (n) => { let s = 0; for (let i = 2; i <= n; i++) s += Math.log(i); return s; };
+  const lc = (n, k) => lf(n) - lf(k) - lf(n - k);
+  const N = n1 + n2, K = a1 + b1;
+  let p = 0;
+  for (let x = a1; x <= Math.min(n1, K); x++) p += Math.exp(lc(K, x) + lc(N - K, n1 - x) - lc(N, n1));
+  return { p: Math.min(1, p) };
+}
+
 const f1 = (x, c = 1) => (Number.isFinite(x) ? ui.fmt(x, c) : '—');
 const pct = (x) => (Number.isFinite(x) ? `${ui.fmt(x * 100, 0)}%` : '—');
-const fp = (r) => (r ? (r.p < 0.001 ? 'p < 0,001' : `p = ${ui.fmt(r.p, 3)}`) : 'dados insuficientes');
-
+const fp = (r) => (r ? (r.p < 0.001 ? 'p < 0,001' : `p = ${ui.fmt(r.p, 3)}`) : 'poucos dados');
+const pc = (r) => (r ? (r.p < 0.001 ? '<0,001' : ui.fmt(r.p, 2)) : '—');
+const efTxt = (x) => (Number.isFinite(x) ? `${x >= 0 ? '+' : '−'}${ui.fmt(Math.abs(x), 2)}` : '—');
+const efNome = (x) => (!Number.isFinite(x) ? '' : Math.abs(x) < 0.1 ? 'nulo' : Math.abs(x) < 0.3 ? 'pequeno' : Math.abs(x) < 0.5 ? 'médio' : 'grande');
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /**
  * A janela de 7 dias do H1 (do 1.º scan até 7 dias depois) está completa se já passou
@@ -89,17 +112,20 @@ const janelaCompleta = (l, e) => somar(l.primeiro_dia, 7) < e.hoje && somar(l.pr
 function grupo(linhas, v, e) {
   const ids = linhas.filter((l) => l.variante === v);
   const part = ids.filter((l) => l.subidas >= 1);
-  const taxa = part.map((l) => l.subidas / Math.max(1, l.semanas_expostas));
   const h1 = part.filter((l) => janelaCompleta(l, e));
-  const sub7 = h1.map((l) => l.subidas_7d);
   const rep7 = h1.map((l) => Math.max(0, l.subidas_7d - 1));
+  const comMeta = part.filter((l) => l.meta_semanal);
   return {
-    ids: ids.length, n: part.length, part, taxa, n7: h1.length, sub7, rep7,
-    taxaMedia: media(taxa), taxaMediana: mediana(taxa),
-    dois: part.length ? part.filter((l) => l.dias >= 2).length / part.length : NaN,
-    sub7Media: media(sub7), sub7Mediana: mediana(sub7),
-    rep7Media: media(rep7), rep7Mediana: mediana(rep7),
-    rep7Algum: h1.length ? rep7.filter((x) => x >= 1).length / h1.length : NaN,
+    v, ids: ids.length, n: part.length, part, h1, n7: h1.length,
+    taxa: part.map((l) => l.subidas / Math.max(1, l.semanas_expostas)),
+    sub7: h1.map((l) => l.subidas_7d), rep7,
+    dias: part.map((l) => l.dias), andares: part.map((l) => l.andares),
+    subidas: soma(part.map((l) => l.subidas)),
+    voltaram: part.filter((l) => l.dias >= 2).length,
+    comRep: rep7.filter((x) => x >= 1).length,
+    nMeta: comMeta.length,
+    metaMedia: media(comMeta.map((l) => l.meta_semanal)),
+    cumpriu: comMeta.filter((l) => l.por_semana.some((n) => n >= l.meta_semanal)).length,
   };
 }
 
@@ -126,8 +152,11 @@ function mostrarLogin(erro = '') {
 }
 
 async function entrar(pw) {
-  ecra.innerHTML = '<div class="carregar"><div class="roda"></div><span>A carregar…</span></div>';
-  let r, coletivo;
+  // Ao atualizar, o painel anterior fica visível (mais claro) em vez de saltar para "a carregar".
+  const painelAtual = ecra.querySelector('.dash');
+  if (painelAtual) painelAtual.classList.add('a-atualizar');
+  else ecra.innerHTML = '<div class="carregar"><div class="roda"></div><span>A carregar…</span></div>';
+  let r, coletivo, leituras = null;
   try {
     [r, coletivo] = await Promise.all([
       rpc('painel', { p_password: pw, p_incluir_fora: comTestes() }),
@@ -142,14 +171,23 @@ async function entrar(pw) {
       ? 'Demasiadas tentativas falhadas. Espera 15 minutos.' : 'Password incorreta.');
   }
   try { sessionStorage.setItem(CHAVE, pw); } catch { /* */ }
-  mostrarPainel({ ...r, coletivo });
+  // Leituras uma a uma (hora do dia, dia da semana, percursos, tempos). Só depois do login certo.
+  try {
+    const l = await rpc('painel_leituras', { p_password: pw, p_incluir_fora: comTestes() });
+    if (l.ok) leituras = l.leituras;
+  } catch (e) { console.error(e); }
+  mostrarPainel({ ...r, coletivo, leituras });
 }
 
 // ---------------------------------------------------------------------
 // Painel
 // ---------------------------------------------------------------------
 let dados = null;
-let maisAberto = false; // "Mais" fica aberto quando se muda uma opção lá dentro
+const SERIES = [
+  { id: 'A', nome: 'A · coletivo', cor: 'var(--serie-a)' },
+  { id: 'B', nome: 'B · pessoal', cor: 'var(--serie-b)' },
+];
+const DIAS_SEMANA = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 function mostrarPainel(d) {
   dados = d;
@@ -160,125 +198,219 @@ function mostrarPainel(d) {
   const L = d.participantes.filter((l) => (l.variante === 'A' || l.variante === 'B') && !(semEx && l.ex_convidado));
   const e = d.estudo;
   const A = grupo(L, 'A', e), B = grupo(L, 'B', e);
+  const G = { A, B };
   const total = A.n + B.n;
   const obj = CONFIG.objetivoParticipantes, min = CONFIG.minimoParticipantes;
-  const h1rep = mannWhitney(A.rep7, B.rep7);
-  const h1sub = mannWhitney(A.sub7, B.sub7);
-  const mwTaxa = mannWhitney(A.taxa, B.taxa);
-  const estado = e.hoje < e.inicio ? `começa a ${dataPt(e.inicio)}`
-    : e.hoje > e.fim ? 'terminado' : `dia ${diasEntre(e.inicio, e.hoje) + 1} de ${diasEntre(e.inicio, e.fim) + 1}`;
-  const veredito = !h1rep ? 'Ainda poucos dados'
-    : h1rep.p < 0.05 ? `A sobe mais do que B · ${fp(h1rep)}`
-    : `${e.hoje > e.fim ? 'Sem diferença significativa' : 'Ainda sem diferença'} · ${fp(h1rep)}`;
-  const cor = (v) => `<i class="cor" style="background:var(--serie-${v.toLowerCase()})"></i>`;
-  const linha = (rot, a, b, p = '') => `<tr><td>${rot}</td><td class="n">${a}</td><td class="n">${b}</td><td class="n nota">${p}</td></tr>`;
-  const mm = (x, y) => `${f1(x, 1)} / ${f1(y, 1)}`;
-  const pc = (r) => (r ? (r.p < 0.001 ? '<0,001' : ui.fmt(r.p, 2)) : '—');
+  const diasEstudo = diasEntre(e.inicio, e.fim) + 1;
+  const diaAtual = Math.max(0, Math.min(diasEstudo, diasEntre(e.inicio, e.hoje) + 1));
+  const estado = e.hoje < e.inicio ? `começa a ${dataPt(e.inicio)}` : e.hoje > e.fim ? 'terminado' : `dia ${diaAtual} de ${diasEstudo}`;
+
+  // Testes
+  const tH1 = teste(A.rep7, B.rep7), tSub7 = teste(A.sub7, B.sub7), tTaxa = teste(A.taxa, B.taxa);
+  const tDias = teste(A.dias, B.dias), tAnd = teste(A.andares, B.andares);
+  const fVolta = fisher(A.voltaram, A.n, B.voltaram, B.n);
+  const fRep = fisher(A.comRep, A.n7, B.comRep, B.n7);
+  const veredito = !tH1.r ? 'Ainda poucos dados para testar'
+    : tH1.r.p < 0.05 ? 'A repete mais do que B'
+    : e.hoje > e.fim ? 'Sem diferença significativa' : 'Ainda sem diferença significativa';
+
+  // Leituras (podem faltar se o pedido falhou)
+  const exIds = new Set(d.participantes.filter((l) => l.ex_convidado).map((l) => l.id));
+  const lv = (d.leituras || []).filter((x) => (x.variante === 'A' || x.variante === 'B') && !(semEx && exIds.has(x.participante)));
+  const validas = lv.filter((x) => x.resultado === 'valida');
+
+  const mm = (a) => `${f1(media(a), 1)} / ${f1(mediana(a), 1)}`;
+  // t = resultado de teste() ({ r, ef }) ou de fisher() ({ p } ou null)
+  const linhaT = (rot, a, b, t) => {
+    const mw = t != null && 'ef' in t;
+    return `<tr><td>${rot}</td><td class="n">${a}</td><td class="n">${b}</td>
+      <td class="n">${pc(mw ? t.r : t)}</td><td class="n">${mw ? efTxt(t.ef) : ''}</td></tr>`;
+  };
+  const prop = (k, n) => (n ? `${pct(k / n)} <span class="nota">(${k}/${n})</span>` : '—');
 
   ecra.innerHTML = `
-    <div class="meta-linha" style="align-items:center;flex-wrap:wrap">
-      <div><h1 style="margin:8px 0 0">Painel do docente</h1>
-        <p class="muted" style="margin:0">${dataPt(e.inicio)} – ${dataPt(e.fim)} · ${estado}</p></div>
+  <div class="dash">
+    <header class="cabeca-painel">
+      <div><h1>Painel do docente</h1>
+        <p class="muted" style="margin:0">${dataPt(e.inicio)} – ${dataPt(e.fim)} · ${estado} ·
+          atualizado às ${new Date(d.gerado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</p></div>
       <div class="botoes">
         <button class="btn pequeno secundario" id="atualizar">Atualizar</button>
         <button class="btn pequeno secundario" id="sair">Sair</button>
       </div>
+    </header>
+
+    <div class="filtros" role="group" aria-label="Filtros (aplicam-se a todo o painel)">
+      <label class="filtro"><input type="checkbox" id="testes" ${d.inclui_fora ? 'checked' : ''}>
+        Incluir leituras de teste <span class="nota">(${d.scans_fora_estudo})</span></label>
+      <label class="filtro"><input type="checkbox" id="sem-ex" ${semEx ? 'checked' : ''}>
+        Excluir quem usou sem grupo antes de 20/11 <span class="nota">(A ${nEx.A} · B ${nEx.B})</span></label>
+    </div>
+    ${d.inclui_fora ? '<p class="aviso-caixa largo-total" style="margin:0"><strong>A mostrar leituras de teste.</strong> Não usar estes números na análise.</p>' : ''}
+
+    <div class="kpis">
+      ${kpi('Participantes', `${total}<span class="de"> / ${obj}</span>`,
+        total >= min ? `Mínimo de ${min} atingido` : `Faltam ${min - total} para o mínimo (${min})`, total / obj)}
+      ${kpi('Subidas válidas', ui.fmt(A.subidas + B.subidas), `A ${ui.fmt(A.subidas)} · B ${ui.fmt(B.subidas)}`)}
+      ${kpi('Voltaram a subir', pct((A.voltaram + B.voltaram) / total), 'Subiram em 2 ou mais dias')}
+      ${kpi('Subidas por pessoa/semana', f1(media([...A.taxa, ...B.taxa]), 1), `A ${f1(media(A.taxa), 1)} · B ${f1(media(B.taxa), 1)}`)}
+      ${kpi('Estudo', `${diaAtual}<span class="de"> / ${diasEstudo} dias</span>`, `Termina a ${dataPt(e.fim)}`, diaAtual / diasEstudo)}
     </div>
 
-    ${d.inclui_fora ? `<p class="aviso-caixa" style="margin:0">A mostrar leituras de teste: não usar na análise.
-      <button class="ligacao-btn" id="tirar-testes">Tirar</button></p>` : ''}
-
-    <div class="grelha">
-      <section class="cartao kpi">
-        <div class="rotulo">Participantes</div>
-        <div class="valor num">${total}<span class="muted" style="font-size:1.1rem"> / ${obj}</span></div>
-        <div class="barra alvo" style="margin:10px 0 6px"><span style="width:${Math.min(100, total / obj * 100)}%"></span></div>
-        <div class="nota">${total >= min ? `Mínimo de ${min} atingido` : `Faltam ${min - total} para o mínimo (${min})`}</div>
-      </section>
-      <section class="cartao kpi"><div class="rotulo">${cor('A')}A · coletivo</div><div class="valor num">${A.n}</div></section>
-      <section class="cartao kpi"><div class="rotulo">${cor('B')}B · pessoal</div><div class="valor num">${B.n}</div></section>
-    </div>
-
-    <section class="cartao">
+    <section class="cartao s5">
       <h2>H1 · subidas repetidas na 1.ª semana</h2>
+      <p class="sub">A versão coletiva (A) faz repetir mais do que a pessoal (B)?</p>
       <div class="duelo">
-        <div>${cor('A')}A <span class="num">${f1(A.rep7Media, 1)}</span></div>
-        <div>${cor('B')}B <span class="num">${f1(B.rep7Media, 1)}</span></div>
+        ${SERIES.map((s) => `<div><span class="chave"><i style="background:${s.cor}"></i>${s.nome}</span>
+          <span class="valor">${Number.isFinite(media(G[s.id].rep7))
+            ? media(G[s.id].rep7).toLocaleString('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</span><span class="nota">média · n = ${G[s.id].n7}</span></div>`).join('')}
       </div>
-      <p style="margin:10px 0 0"><strong>${veredito}</strong></p>
-      <p class="nota" style="margin:4px 0 0">Média por pessoa · ${A.n7} vs ${B.n7} pessoas com a 1.ª semana completa</p>
+      <p class="veredito"><strong>${veredito}</strong><br>
+        <span class="nota">${fp(tH1.r)} · efeito ${efTxt(tH1.ef)}${efNome(tH1.ef) ? ` (${efNome(tH1.ef)})` : ''}</span></p>
+      <div class="grafico" data-grafico="h1"></div>
+      <p class="nota" style="margin:6px 0 0">Cada ponto é uma pessoa com a 1.ª semana completa. O traço é a média.</p>
     </section>
 
-    <section class="cartao">
+    <section class="cartao s7">
       <h2>A vs B</h2>
+      <p class="sub">Média / mediana por pessoa</p>
       <div class="tabela-scroll"><table>
-        <thead><tr><th>Média / mediana</th><th class="n">A</th><th class="n">B</th><th class="n">p</th></tr></thead>
+        <thead><tr><th></th><th class="n">${chave('A')}A</th><th class="n">${chave('B')}B</th><th class="n">p</th><th class="n">efeito</th></tr></thead>
         <tbody>
-          ${linha('Repetidas na 1.ª semana (H1)', mm(A.rep7Media, A.rep7Mediana), mm(B.rep7Media, B.rep7Mediana), pc(h1rep))}
-          ${linha('Subidas na 1.ª semana', mm(A.sub7Media, A.sub7Mediana), mm(B.sub7Media, B.sub7Mediana), pc(h1sub))}
-          ${linha('Subidas por semana', mm(A.taxaMedia, A.taxaMediana), mm(B.taxaMedia, B.taxaMediana), pc(mwTaxa))}
-          ${linha('Voltaram a subir noutro dia', pct(A.dois), pct(B.dois))}
+          ${linhaT('<strong>Repetidas na 1.ª semana (H1)</strong>', mm(A.rep7), mm(B.rep7), tH1)}
+          ${linhaT('Subidas na 1.ª semana', mm(A.sub7), mm(B.sub7), tSub7)}
+          ${linhaT('Subidas por semana', mm(A.taxa), mm(B.taxa), tTaxa)}
+          ${linhaT('Dias com subida', mm(A.dias), mm(B.dias), tDias)}
+          ${linhaT('Andares subidos', mm(A.andares), mm(B.andares), tAnd)}
+          ${linhaT('Repetiram na 1.ª semana', prop(A.comRep, A.n7), prop(B.comRep, B.n7), fRep)}
+          ${linhaT('Voltaram noutro dia', prop(A.voltaram, A.n), prop(B.voltaram, B.n), fVolta)}
+        </tbody>
+      </table></div>
+      <p class="nota" style="margin:8px 0 0">p unilateral (A &gt; B): Mann–Whitney exato até ${MAX_EXATO} pessoas; Fisher exato nas proporções.
+        Efeito: rank-biserial, de −1 a +1 (+ = A maior).</p>
+    </section>
+
+    <section class="cartao s12">
+      <div class="titulo-linha"><h2>Subidas válidas por dia</h2>${legenda(SERIES)}</div>
+      <div class="grafico" data-grafico="dia"></div>
+      ${vista(['Dia', 'A', 'A pessoas', 'B', 'B pessoas', 'Sem grupo'],
+        d.diario.map((x) => [dataPt(x.dia), x.A, x.A_pessoas, x.B, x.B_pessoas, x.G ?? 0]))}
+    </section>
+
+    <section class="cartao s6">
+      <div class="titulo-linha"><h2>Participantes ao longo do estudo</h2>${legenda([...SERIES, TOTAL], 'linha')}</div>
+      <div class="grafico" data-grafico="recrutamento"></div>
+      ${vista(['Dia', 'A', 'B', 'Total'], recrutamento(d.diario, A, B).map((x) => [dataPt(x.dia), x.A, x.B, x.A + x.B]))}
+    </section>
+
+    <section class="cartao s6">
+      <div class="titulo-linha"><h2>Subidas por pessoa, por semana</h2>${legenda(SERIES, 'linha')}</div>
+      <div class="grafico" data-grafico="semanas"></div>
+      ${vista(['Semana', 'A média', 'A n', 'B média', 'B n'], semanas(e, A, B).map((s) =>
+        [`${s.rot} (${dataPt(s.ini)}–${dataPt(s.fim)})`, f1(s.A, 2), s.nA, f1(s.B, 2), s.nB]))}
+    </section>
+
+    <section class="cartao s6">
+      <div class="titulo-linha"><h2>A que horas sobem</h2>${legenda(SERIES)}</div>
+      <div class="grafico" data-grafico="horas"></div>
+      ${d.leituras ? vista(['Hora', 'A', 'B'], porHora(validas).map((x) => [x.rot, x.v.A, x.v.B])) : ''}
+    </section>
+
+    <section class="cartao s6">
+      <div class="titulo-linha"><h2>Dia da semana</h2>${legenda(SERIES)}</div>
+      <div class="grafico" data-grafico="semana"></div>
+      ${d.leituras ? vista(['Dia', 'A', 'B'], porDiaSemana(validas).map((x) => [x.rot, x.v.A, x.v.B])) : ''}
+    </section>
+
+    <section class="cartao s6">
+      <div class="titulo-linha"><h2>Quantas vezes cada pessoa subiu</h2>${legenda(SERIES)}</div>
+      <div class="grafico" data-grafico="distribuicao"></div>
+      ${vista(['Subidas', 'Pessoas A', 'Pessoas B'], distribuicao(A, B).map((x) => [x.rot, x.v.A, x.v.B]))}
+    </section>
+
+    <section class="cartao s6">
+      <h2>Meta semanal</h2>
+      <p class="sub">É igual nas duas versões: serve para ver se explica diferenças entre A e B.</p>
+      <div class="tabela-scroll"><table>
+        <thead><tr><th></th><th class="n">${chave('A')}A</th><th class="n">${chave('B')}B</th></tr></thead>
+        <tbody>
+          <tr><td>Escolheram uma meta</td><td class="n">${prop(A.nMeta, A.n)}</td><td class="n">${prop(B.nMeta, B.n)}</td></tr>
+          <tr><td>Meta média (vezes/semana)</td><td class="n">${f1(A.metaMedia, 1)}</td><td class="n">${f1(B.metaMedia, 1)}</td></tr>
+          <tr><td>Cumpriram pelo menos 1 semana</td><td class="n">${prop(A.cumpriu, A.nMeta)}</td><td class="n">${prop(B.cumpriu, B.nMeta)}</td></tr>
         </tbody>
       </table></div>
     </section>
 
-    <section class="cartao">
-      <h2>Subidas por dia</h2>
-      <div class="legenda" aria-hidden="true">
-        <span><i style="background:var(--serie-a)"></i>A</span>
-        <span><i style="background:var(--serie-b)"></i>B</span>
-      </div>
-      <div class="grafico" id="grafico">${grafico(d.diario)}<div class="dica" id="dica"></div></div>
-      <details style="margin-top:10px"><summary class="ligacao-btn" style="display:inline-block">Por semana</summary>
-        <div class="tabela-scroll">${tabelaSemanas(A, B, e)}</div>
-      </details>
-      <details><summary class="ligacao-btn" style="display:inline-block">Por dia</summary>
-        <div class="tabela-scroll"><table>
-          <thead><tr><th>Dia</th><th class="n">A</th><th class="n">pessoas</th><th class="n">B</th><th class="n">pessoas</th><th class="n">Sem grupo</th></tr></thead>
-          <tbody>${d.diario.map((x) => `<tr><td>${dataPt(x.dia)}</td><td class="n">${x.A}</td><td class="n">${x.A_pessoas}</td><td class="n">${x.B}</td><td class="n">${x.B_pessoas}</td><td class="n">${x.G ?? 0}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Ainda sem dias.</td></tr>'}</tbody>
-        </table></div>
-      </details>
+    ${cartaoQualidade(d, validas)}
+
+    <section class="cartao s6">
+      <h2>Percursos mais comuns</h2>
+      <p class="sub">Subidas válidas, do piso de partida ao de chegada</p>
+      ${percursos(validas, d.leituras)}
     </section>
 
     ${cartaoMeta(d.coletivo)}
 
-    <section class="cartao">
+    <section class="cartao s6">
       <h2>Exportar CSV</h2>
+      <p class="sub">Anónimo: P001, P002… (iguais nos três ficheiros)</p>
       <div class="botoes">
         <button class="btn pequeno" id="csv-part">Participantes</button>
         <button class="btn pequeno" id="csv-dia">Dias</button>
         <button class="btn pequeno" id="csv-leituras">Leituras</button>
       </div>
-      <p class="nota" style="margin:8px 0 0">Anónimo: P001, P002…</p>
+      <details class="como" style="margin-top:14px"><summary>Como se calcula</summary>
+        <ul class="nota">
+          <li>Participante = pelo menos 1 subida válida. Os antigos “sem grupo” (${d.convidados?.com_subida ?? 0} pessoas,
+            ${d.convidados?.subidas ?? 0} subidas) ficam fora do A/B.</li>
+          <li>1.ª semana = 7 dias desde a 1.ª leitura; só conta quem a completou até ${dataPt(e.fim)}.
+            Repetidas = subidas nessa semana menos a primeira.</li>
+          <li>Subidas por semana = subidas ÷ semanas desde a 1.ª leitura (mínimo 1).</li>
+          <li>Regras: ${d.regras.min_seg_por_andar}–${d.regras.max_seg_por_andar} s por andar,
+            ${Math.round(d.regras.cooldown_seg / 60)} min entre subidas. Contas criadas: ${d.contas ?? 0}.</li>
+          <li>Confirmar os testes no R/SPSS com o CSV de participantes.</li>
+        </ul>
+      </details>
     </section>
+  </div>`;
 
-    <details class="cartao mais-opcoes" ${maisAberto ? 'open' : ''}>
-      <summary><strong>Mais</strong> <span class="nota">opções, qualidade dos dados, como se calcula</span></summary>
-      <div class="pilha" style="margin-top:12px">
-        <label class="opcao"><input type="checkbox" id="testes" ${d.inclui_fora ? 'checked' : ''}>
-          <span>Incluir leituras de teste <span class="nota">(${d.scans_fora_estudo} fora do estudo)</span></span></label>
-        <label class="opcao"><input type="checkbox" id="sem-ex" ${semEx ? 'checked' : ''}>
-          <span>Excluir quem usou sem grupo antes de 20/11 <span class="nota">(A = ${nEx.A}, B = ${nEx.B})</span></span></label>
-        ${cartaoQualidade(d)}
-        <div class="nota">
-          <p style="margin:0 0 6px"><strong>Como se calcula.</strong> Participante = pelo menos 1 subida válida.
-            1.ª semana = 7 dias desde a 1.ª leitura; só conta quem a completou até ${dataPt(e.fim)}.
-            Repetidas = subidas nessa semana menos a primeira.</p>
-          <p style="margin:0 0 6px">p = Mann–Whitney unilateral A &gt; B (exato até ${MAX_EXATO} pessoas). Confirmar no R/SPSS.</p>
-          <p style="margin:0">Regras: ${d.regras.min_seg_por_andar}–${d.regras.max_seg_por_andar} s por andar,
-            ${Math.round(d.regras.cooldown_seg / 60)} min entre subidas. Antigos sem grupo: ${d.convidados?.com_subida ?? 0} pessoas,
-            ${d.convidados?.subidas ?? 0} subidas (fora do A/B). Contas: ${d.contas ?? 0}.</p>
-        </div>
-        <a class="ligacao-btn" href="../cartazes/">Cartazes</a>
-      </div>
-    </details>
+  // Gráficos: desenhados à largura real de cada cartão (e outra vez quando a janela muda).
+  montarGraficos({
+    h1: (w) => svgPontos(w, SERIES.map((s) => ({ ...s, pontos: G[s.id].h1.map((l) => ({ id: l.id, v: Math.max(0, l.subidas_7d - 1) })) })),
+      { vazio: 'Aparece quando houver pessoas com a 1.ª semana completa.', unidade: ['repetida', 'repetidas'] }),
+    dia: (w) => svgColunas(w, d.diario.map((x) => ({
+      rot: `${x.dia.slice(8, 10)}/${x.dia.slice(5, 7)}`, v: { A: x.A, B: x.B },
+      tip: dicaHtml(dataPt(x.dia), [
+        { cor: 'var(--serie-a)', valor: x.A, txt: `A · ${x.A_pessoas} ${x.A_pessoas === 1 ? 'pessoa' : 'pessoas'}` },
+        { cor: 'var(--serie-b)', valor: x.B, txt: `B · ${x.B_pessoas} ${x.B_pessoas === 1 ? 'pessoa' : 'pessoas'}` },
+        ...(x.G ? [{ cor: 'var(--neutro-forte)', valor: x.G, txt: 'sem grupo' }] : [])]),
+    })), { h: 240, vazio: 'O gráfico aparece quando o estudo começar.' }),
+    recrutamento: (w) => {
+      const r = recrutamento(d.diario, A, B);
+      return svgLinhas(w, r.map((x) => `${x.dia.slice(8, 10)}/${x.dia.slice(5, 7)}`), [...SERIES, TOTAL].map((s) => ({
+        ...s, valores: r.map((x) => (s.id === 'T' ? x.A + x.B : x[s.id])) })),
+      { tips: r.map((x) => dicaHtml(dataPt(x.dia), [
+        { cor: 'var(--serie-a)', valor: x.A, txt: 'A' }, { cor: 'var(--serie-b)', valor: x.B, txt: 'B' },
+        { cor: TOTAL.cor, valor: x.A + x.B, txt: 'total' }])) });
+    },
+    semanas: (w) => {
+      const s = semanas(e, A, B);
+      return svgLinhas(w, s.map((x) => x.rot), SERIES.map((se) => ({ ...se, valores: s.map((x) => x[se.id]) })), {
+        inteiro: false, minEsp: 30,
+        tips: s.map((x) => dicaHtml(`${x.rot}: ${dataPt(x.ini)}–${dataPt(x.fim)}`, [
+          { cor: 'var(--serie-a)', valor: f1(x.A, 2), txt: `A · n = ${x.nA}` },
+          { cor: 'var(--serie-b)', valor: f1(x.B, 2), txt: `B · n = ${x.nB}` }])) });
+    },
+    horas: (w) => (d.leituras ? svgColunas(w, porHora(validas).map((x) => ({ ...x, tip: dicaAB(`${x.rot}h`, x.v) })),
+      { vazio: 'Ainda sem subidas.', minEsp: 30 }) : semLeituras()),
+    semana: (w) => (d.leituras ? svgColunas(w, porDiaSemana(validas).map((x) => ({ ...x, tip: dicaAB(x.rot, x.v) })),
+      { vazio: 'Ainda sem subidas.', minEsp: 30 }) : semLeituras()),
+    distribuicao: (w) => svgColunas(w, distribuicao(A, B).map((x) => ({
+      ...x, tip: dicaAB(`${x.rot} ${x.rot === '1' ? 'subida' : 'subidas'}`, x.v, ['pessoa', 'pessoas']) })),
+    { vazio: 'Ainda sem participantes.', minEsp: 30 }),
+  });
 
-    <p class="nota centro">Atualizado às ${new Date(d.gerado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</p>`;
-
-  const definirTestes = (sim) => {
-    try { sessionStorage.setItem(CHAVE_TESTES, sim ? '1' : '0'); } catch { /* */ }
-    entrar(sessionStorage.getItem(CHAVE) || '');
-  };
+  // Botões e filtros
   document.getElementById('atualizar').onclick = () => entrar(sessionStorage.getItem(CHAVE) || '');
   document.getElementById('sair').onclick = () => { sessionStorage.removeItem(CHAVE); mostrarLogin(); };
   const suf = d.inclui_fora ? '-com-testes' : '';
@@ -288,114 +420,168 @@ function mostrarPainel(d) {
     const b = ev.currentTarget;
     b.disabled = true; b.textContent = 'A preparar…';
     try {
-      const r = await rpc('painel_leituras', { p_password: sessionStorage.getItem(CHAVE) || '', p_incluir_fora: d.inclui_fora });
-      if (!r.ok) throw new Error(r.erro);
+      let lista = d.leituras;
+      if (!lista) {
+        const r = await rpc('painel_leituras', { p_password: sessionStorage.getItem(CHAVE) || '', p_incluir_fora: d.inclui_fora });
+        if (!r.ok) throw new Error(r.erro);
+        lista = r.leituras;
+      }
       descarregar(`sobe-leituras${suf}.csv`, csv([
         ['participante', 'variante', 'data', 'hora', 'piso_origem', 'piso', 'resultado', 'segundos', 'andares', 'no_estudo'],
-        ...r.leituras.map((x) => [x.participante, x.variante, x.data, x.hora, x.piso_origem, x.piso, x.resultado,
+        ...lista.map((x) => [x.participante, x.variante, x.data, x.hora, x.piso_origem, x.piso, x.resultado,
           x.segundos, x.andares, x.no_estudo ? 'sim' : 'nao'])]));
-    } catch (e) {
-      console.error(e); alert('Não foi possível exportar. Tenta outra vez.');
+    } catch (err) {
+      console.error(err); alert('Não foi possível exportar. Tenta outra vez.');
     } finally { b.disabled = false; b.textContent = 'Leituras'; }
   };
   document.getElementById('sem-ex').onchange = (ev) => {
     try { sessionStorage.setItem(CHAVE_EX, ev.target.checked ? '1' : '0'); } catch { /* */ }
-    maisAberto = true; mostrarPainel(dados);
+    mostrarPainel(dados);
   };
-  document.getElementById('testes').onchange = (ev) => { maisAberto = true; definirTestes(ev.target.checked); };
-  document.getElementById('tirar-testes')?.addEventListener('click', () => definirTestes(false));
-  ligarDicas(d.diario);
+  document.getElementById('testes').onchange = (ev) => {
+    try { sessionStorage.setItem(CHAVE_TESTES, ev.target.checked ? '1' : '0'); } catch { /* */ }
+    entrar(sessionStorage.getItem(CHAVE) || '');
+  };
+  ligarDicas(ecra.querySelector('.dash'));
 }
 
-function tabelaSemanas(A, B, e) {
-  const n = dados.estudo.semanas;
-  const linhas = [];
-  for (let k = 1; k <= n; k++) {
+// ---------------------------------------------------------------------
+// Peças do painel
+// ---------------------------------------------------------------------
+const TOTAL = { id: 'T', nome: 'Total', cor: 'var(--neutro-forte)' };
+const chave = (v) => `<i class="chave-cor" style="background:var(--serie-${v.toLowerCase()})"></i>`;
+
+function kpi(rotulo, valor, nota, fracao) {
+  return `<section class="cartao kpi">
+    <div class="rotulo">${rotulo}</div>
+    <div class="valor">${valor}</div>
+    ${fracao != null ? `<div class="medidor"><span style="width:${Math.max(0, Math.min(100, fracao * 100))}%"></span></div>` : ''}
+    <div class="nota">${nota}</div>
+  </section>`;
+}
+
+function legenda(series, tipo = 'barra') {
+  return `<div class="legenda">${series.map((s) => `<span><i class="${tipo}" style="background:${s.cor}"></i>${esc(s.nome)}</span>`).join('')}</div>`;
+}
+
+/** Tabela equivalente ao gráfico (acessível e sem precisar de passar o rato). */
+function vista(cab, linhas) {
+  if (!linhas.length) return '';
+  return `<details class="vista"><summary>Ver tabela</summary><div class="tabela-scroll"><table>
+    <thead><tr>${cab.map((c, i) => `<th${i ? ' class="n"' : ''}>${esc(c)}</th>`).join('')}</tr></thead>
+    <tbody>${linhas.map((l) => `<tr>${l.map((c, i) => `<td${i ? ' class="n"' : ''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table></div></details>`;
+}
+
+/** Dica: o valor primeiro (forte), o nome a seguir; chave em traço da cor da série. */
+function dicaHtml(titulo, linhas) {
+  return `<div class="dica-titulo">${esc(titulo)}</div>${linhas.map((l) =>
+    `<div><i style="background:${l.cor}"></i><b>${esc(l.valor)}</b> ${esc(l.txt)}</div>`).join('')}`;
+}
+const dicaAB = (titulo, v, un = ['subida', 'subidas']) => dicaHtml(titulo, SERIES.map((s) =>
+  ({ cor: s.cor, valor: v[s.id], txt: `${v[s.id] === 1 ? un[0] : un[1]} · ${s.id}` })));
+const semLeituras = () => '<p class="muted vazio">Não foi possível carregar as leituras. Carrega em Atualizar.</p>';
+
+/** Participantes acumulados (por dia da 1.ª leitura). */
+function recrutamento(diario, A, B) {
+  return diario.map((x) => ({
+    dia: x.dia,
+    A: A.part.filter((l) => l.primeiro_dia <= x.dia).length,
+    B: B.part.filter((l) => l.primeiro_dia <= x.dia).length,
+  }));
+}
+
+/** Subidas por pessoa em cada semana do estudo (só quem já tinha começado), até à semana atual. */
+function semanas(e, A, B) {
+  const out = [];
+  for (let k = 1; k <= dados.estudo.semanas; k++) {
     const ini = somar(e.inicio, (k - 1) * 7);
+    if (ini > e.hoje && k > 1) break;
     const fim = minStr(somar(ini, 6), e.fim);
-    const stats = (G) => {
-      const ativos = G.part.filter((l) => l.primeiro_dia <= fim).map((l) => l.por_semana[k - 1] ?? 0);
-      return `${f1(media(ativos), 2)} / ${f1(mediana(ativos), 1)} <span class="nota">(n=${ativos.length})</span>`;
-    };
-    linhas.push(`<tr><td>Semana ${k}<div class="nota">${dataPt(ini)} – ${dataPt(fim)}</div></td><td class="n">${stats(A)}</td><td class="n">${stats(B)}</td></tr>`);
+    const ativos = (Gr) => Gr.part.filter((l) => l.primeiro_dia <= fim).map((l) => l.por_semana[k - 1] ?? 0);
+    const a = ativos(A), b = ativos(B);
+    out.push({ rot: `S${k}`, ini, fim, A: a.length ? media(a) : null, B: b.length ? media(b) : null, nA: a.length, nB: b.length });
   }
-  return `<table><thead><tr><th>Subidas por pessoa</th><th class="n">A · média / mediana</th><th class="n">B · média / mediana</th></tr></thead><tbody>${linhas.join('')}</tbody></table>`;
+  return out;
 }
 
-// ---------------------------------------------------------------------
-// Gráfico de barras agrupadas (SVG, sem bibliotecas)
-// ---------------------------------------------------------------------
-function grafico(diario) {
-  if (!diario.length) return '<p class="muted">O gráfico aparece quando o estudo começar.</p>';
-  const W = 900, H = 260, m = { t: 12, r: 8, b: 30, l: 34 };
-  const iw = W - m.l - m.r, ih = H - m.t - m.b;
-  const max = Math.max(1, ...diario.map((x) => Math.max(x.A, x.B)));
-  const passo = max <= 5 ? 1 : Math.ceil(max / 4 / 5) * 5 || 1;
-  const topo = Math.ceil(max / passo) * passo;
-  const y = (v) => m.t + ih - (v / topo) * ih;
-  const bw = iw / diario.length;
-  const barra = Math.max(2, Math.min(18, (bw - 6) / 2 - 1));
-  const r = Math.min(4, barra / 2);
-  const coluna = (x0, v, cor) => {
-    if (!v) return '';
-    const yt = y(v), yb = y(0);
-    return `<path d="M${x0},${yb}V${yt + r}Q${x0},${yt} ${x0 + r},${yt}H${x0 + barra - r}Q${x0 + barra},${yt} ${x0 + barra},${yt + r}V${yb}Z" fill="${cor}"/>`;
-  };
-  let grade = '';
-  for (let v = 0; v <= topo; v += passo) {
-    grade += `<line class="grade" x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"/>
-      <text class="eixo" x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
-  }
-  const cada = Math.ceil(diario.length / 12);
-  let barras = '', rotulos = '', alvos = '';
-  diario.forEach((x, i) => {
-    const cx = m.l + bw * i + bw / 2;
-    alvos += `<rect class="alvo-hover" data-i="${i}" x="${m.l + bw * i}" y="${m.t}" width="${bw}" height="${ih}" rx="6"/>`;
-    barras += coluna(cx - barra - 1, x.A, 'var(--serie-a)') + coluna(cx + 1, x.B, 'var(--serie-b)');
-    if (i % cada === 0) rotulos += `<text class="eixo" x="${cx}" y="${H - 10}" text-anchor="middle">${x.dia.slice(8, 10)}/${x.dia.slice(5, 7)}</text>`;
-  });
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Subidas válidas por dia, versões A e B">${grade}${alvos}<g pointer-events="none">${barras}</g>${rotulos}</svg>`;
+function contarAB(lista, chaveDe, chaves) {
+  const v = new Map(chaves.map((k) => [k, { A: 0, B: 0 }]));
+  lista.forEach((x) => { const k = chaveDe(x); if (v.has(k)) v.get(k)[x.variante]++; });
+  return v;
 }
 
-function ligarDicas(diario) {
-  const g = document.getElementById('grafico'), dica = document.getElementById('dica');
-  if (!g || !dica) return;
-  g.addEventListener('pointermove', (ev) => {
-    const alvo = ev.target.closest('.alvo-hover');
-    g.querySelectorAll('.alvo-hover.ativo').forEach((el) => el !== alvo && el.classList.remove('ativo'));
-    if (!alvo) { dica.style.display = 'none'; return; }
-    alvo.classList.add('ativo');
-    const x = diario[Number(alvo.dataset.i)];
-    const caixa = g.getBoundingClientRect();
-    dica.innerHTML = `<strong>${dataPt(x.dia)}</strong><br><i style="background:var(--serie-a)"></i>A: ${x.A} subidas · ${x.A_pessoas} pessoas<br><i style="background:var(--serie-b)"></i>B: ${x.B} subidas · ${x.B_pessoas} pessoas`;
-    dica.style.display = 'block';
-    const px = Math.min(caixa.width - 110, Math.max(110, ev.clientX - caixa.left));
-    dica.style.left = `${px}px`;
-    dica.style.top = `${ev.clientY - caixa.top}px`;
-  });
-  g.addEventListener('pointerleave', () => {
-    dica.style.display = 'none';
-    g.querySelectorAll('.alvo-hover.ativo').forEach((el) => el.classList.remove('ativo'));
-  });
+function porHora(validas) {
+  const horas = validas.map((x) => Number(x.hora.slice(0, 2)));
+  const ini = Math.min(7, ...horas), fim = Math.max(20, ...horas);
+  const ks = Array.from({ length: fim - ini + 1 }, (_, i) => ini + i);
+  const v = contarAB(validas, (x) => Number(x.hora.slice(0, 2)), ks);
+  return ks.map((h) => ({ rot: String(h), v: v.get(h) }));
 }
 
-// ---------------------------------------------------------------------
-// CSV
-// ---------------------------------------------------------------------
-function csv(linhas) {
-  const esc = (v) => (v == null ? '' : /[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
-  return '﻿' + linhas.map((l) => l.map(esc).join(',')).join('\r\n');
+function porDiaSemana(validas) {
+  const v = contarAB(validas, (x) => (new Date(`${x.data}T12:00:00Z`).getUTCDay() + 6) % 7, [0, 1, 2, 3, 4, 5, 6]);
+  return DIAS_SEMANA.map((rot, i) => ({ rot, v: v.get(i) }));
 }
-function csvParticipantes(d) {
-  const n = d.estudo.semanas;
-  const cab = ['participante', 'variante', 'tem_conta', 'ex_convidado', 'primeiro_dia', 'leituras', 'subidas_validas', 'andares',
-    'dias_diferentes', 'subidas_7d', 'repetidas_7d', 'janela_7d_completa', 'semanas_expostas', 'subidas_por_semana', 'meta_semanal',
-    ...Array.from({ length: n }, (_, k) => `semana_${k + 1}`)];
-  const rows = d.participantes.map((l) => [l.id, l.variante, l.tem_conta ? 'sim' : 'nao', l.ex_convidado ? 'sim' : 'nao', l.primeiro_dia, l.n_scans, l.subidas, l.andares,
-    l.dias, l.subidas_7d, Math.max(0, l.subidas_7d - 1), janelaCompleta(l, d.estudo) ? 'sim' : 'nao', l.semanas_expostas,
-    (l.subidas / Math.max(1, l.semanas_expostas)).toFixed(3), l.meta_semanal ?? '', ...l.por_semana]);
-  return csv([cab, ...rows]);
+
+function distribuicao(A, B) {
+  const classes = [['1', 1, 1], ['2', 2, 2], ['3–4', 3, 4], ['5–9', 5, 9], ['10–19', 10, 19], ['20+', 20, Infinity]];
+  return classes.map(([rot, a, b]) => ({
+    rot, v: { A: A.part.filter((l) => l.subidas >= a && l.subidas <= b).length, B: B.part.filter((l) => l.subidas >= a && l.subidas <= b).length },
+  }));
 }
+
+function percursos(validas, temLeituras) {
+  if (!temLeituras) return semLeituras();
+  if (!validas.length) return '<p class="muted vazio">Ainda sem subidas.</p>';
+  const c = new Map();
+  validas.forEach((x) => { const k = `${x.piso_origem} → ${x.piso}`; c.set(k, (c.get(k) || 0) + 1); });
+  const top = [...c].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const max = top[0][1];
+  const andares = media(validas.map((x) => x.andares));
+  return `<div class="hbarras">${top.map(([k, n]) => `<div class="hb" data-tip="${esc(dicaHtml(`Piso ${k}`, [{ cor: 'var(--neutro-forte)', valor: n, txt: n === 1 ? 'subida' : 'subidas' }]))}">
+      <span class="hb-rot">Piso ${esc(k)}</span><span class="hb-trilho"><span style="width:${(n / max) * 100}%"></span></span>
+      <span class="hb-val">${n}</span></div>`).join('')}</div>
+    <p class="nota" style="margin:10px 0 0">Em média, ${f1(andares, 1)} andares por subida.</p>`;
+}
+
+/** Qualidade dos dados: leituras válidas, inícios e rejeitadas por grupo + tempo por andar. */
+function cartaoQualidade(d, validas) {
+  const q = d.qualidade;
+  if (!q) return '';
+  const tipos = [
+    ['valida', 'Válida'], ['continua', 'Continuou (+andares)'], ['inicio', 'Início'], ['descer', 'Desceu'],
+    ['rapido', 'Rápido demais'], ['lento', 'Muito tempo'], ['cooldown', 'Intervalo 5 min'], ['repetido', 'QR 2× seguidas'],
+  ];
+  const classes = [
+    { nome: 'Subida', tipos: ['valida', 'continua'], cor: 'var(--seg-ok)', tinta: 'var(--seg-ok-t)' },
+    { nome: 'Início', tipos: ['inicio', 'descer', 'lento'], cor: 'var(--neutro)', tinta: 'var(--neutro-t)' },
+    { nome: 'Rejeitada', tipos: ['rapido', 'cooldown', 'repetido'], cor: 'var(--seg-rej)', tinta: 'var(--seg-rej-t)' },
+  ];
+  const col = (g, t) => q.resultados?.[g]?.[t] ?? 0;
+  const tot = (g) => tipos.reduce((s, [t]) => s + col(g, t), 0);
+  const grupos = [['A', 'A · coletivo'], ['B', 'B · pessoal'], ['G', 'Sem grupo']].filter(([g]) => g !== 'G' || tot(g));
+  const barras = grupos.map(([g, nome]) => {
+    const t = tot(g);
+    const partes = classes.map((c) => ({ ...c, v: c.tipos.reduce((s, x) => s + col(g, x), 0) })).filter((p) => p.v > 0);
+    return `<div class="seg-linha"><span class="seg-rot">${nome}<span class="nota">${t} leituras</span></span>
+      <div class="seg" role="img" aria-label="${nome}: ${partes.map((p) => `${p.nome} ${pct(p.v / t)}`).join(', ')}">${partes.map((p) =>
+        `<span data-tip="${esc(dicaHtml(nome, [{ cor: p.cor, valor: `${pct(p.v / t)} (${p.v})`, txt: p.nome }]))}"
+          style="flex:${p.v} 1 0;background:${p.cor};color:${p.tinta}">${p.v / t >= 0.14 ? pct(p.v / t) : ''}</span>`).join('') || '<span class="seg-vazio"></span>'}</div></div>`;
+  }).join('');
+  const segAndar = (g) => mediana(validas.filter((x) => x.variante === g && x.andares > 0 && x.segundos != null).map((x) => x.segundos / x.andares));
+  const cA = q.contas_por_grupo?.A ?? 0, cB = q.contas_por_grupo?.B ?? 0;
+  const linhas = tipos.map(([t, rot]) => [rot, ...grupos.map(([g]) => col(g, t))]);
+  return `<section class="cartao s6">
+    <div class="titulo-linha"><h2>Qualidade dos dados</h2>${legenda(classes)}</div>
+    <div class="seg-lista">${barras}</div>
+    <p class="nota" style="margin:12px 0 0">Tempo por andar nas subidas válidas (mediana): A ${f1(segAndar('A'), 0)} s · B ${f1(segAndar('B'), 0)} s.
+      Contas: A ${cA} · B ${cB}${Math.abs(cA - cB) <= 1 ? '' : ' (desequilibrado)'} · sem leituras: ${q.contas_sem_leituras ?? 0}.
+      Muitas rejeitadas = regras mal percebidas.</p>
+    ${vista(['Leitura', ...grupos.map(([, n]) => n)], [...linhas, ['Total', ...grupos.map(([g]) => tot(g))]])}
+  </section>`;
+}
+
 /** Meta coletiva tal como está agora na app (o mesmo que a versão A vê no telemóvel). */
 function cartaoMeta(c) {
   if (!c) return '';
@@ -409,51 +595,201 @@ function cartaoMeta(c) {
     const cls = m.altitude <= p.atual ? 'feito' : (m === p.proximo ? 'proximo' : '');
     return `<li class="${cls}"><span>${m.nome}</span><span class="num" style="font-weight:700">${ui.fmt(m.altitude)} m</span></li>`;
   }).join('');
-  return `<section class="cartao">
-    <h2>Meta coletiva <span class="nota">(o que A vê na app)</span></h2>
+  return `<section class="cartao s6">
+    <h2>Meta coletiva</h2>
+    <p class="sub">O que a versão A vê na app (todas as leituras válidas, todos os grupos)</p>
     ${p.voltas >= 1 ? `<p style="margin:0 0 6px"><strong>${p.subidaN}.ª subida ao ${topo.nome}</strong></p>` : ''}
-    <div style="margin:0 0 12px"><span class="metros-grande num">${ui.fmt(p.atual, 1)}</span>
+    <div style="margin:0 0 12px"><span class="metros-grande">${ui.fmt(p.atual, 1)}</span>
       <span class="muted"> m de ${ui.fmt(topo.altitude)} m · ${topo.nome}</span></div>
     <div class="barra" role="progressbar" aria-label="${rota.titulo}"
       aria-valuemin="0" aria-valuemax="${topo.altitude}" aria-valuenow="${Math.round(p.atual)}">
       <span style="width:${p.pct * 100}%"></span></div>
     <div class="marcos" aria-hidden="true">${ticks}</div>
     <p style="margin:0">Próxima: <strong>${p.proximo.nome}</strong> · faltam ${ui.fmt(p.falta, 1)} m</p>
-    <p class="nota" style="margin:4px 0 0">${ui.fmt(c.subidas)} subidas · ${ui.fmt(c.pessoas)} pessoas (todos os grupos)</p>
-    <details class="mais-metas" style="margin-top:8px">
-      <summary><span>Todas as metas</span></summary>
-      <ul class="lista-marcos">${lista}</ul>
-    </details>
+    <p class="nota" style="margin:4px 0 0">${ui.fmt(c.subidas)} subidas · ${ui.fmt(c.pessoas)} pessoas</p>
+    <details class="vista"><summary>Todas as metas</summary><ul class="lista-marcos">${lista}</ul></details>
   </section>`;
 }
 
-/** Qualidade dos dados: ajuda a perceber se as pessoas estão a perceber as regras. */
-function cartaoQualidade(d) {
-  const q = d.qualidade;
-  if (!q) return '';
-  const tipos = [
-    ['valida', 'Válida'], ['continua', 'Continuou (+andares)'], ['inicio', 'Início'], ['descer', 'Desceu'],
-    ['rapido', 'Rápido demais'], ['lento', 'Muito tempo'], ['cooldown', 'Intervalo 5 min'],
-    ['repetido', 'QR 2× seguidas'],
-  ];
-  const col = (g, t) => q.resultados?.[g]?.[t] ?? 0;
-  const tot = (g) => tipos.reduce((s, [t]) => s + col(g, t), 0);
-  const pct = (g, t) => (tot(g) ? ` <span class="nota">(${Math.round((col(g, t) / tot(g)) * 100)}%)</span>` : '');
-  const linhas = tipos.map(([t, rot]) => `<tr><td>${rot}</td>${['A', 'B', 'G'].map((g) =>
-    `<td class="n">${col(g, t)}${pct(g, t)}</td>`).join('')}</tr>`).join('');
-  const cA = q.contas_por_grupo?.A ?? 0, cB = q.contas_por_grupo?.B ?? 0;
-  return `<div>
-    <h3 style="margin:0 0 4px">Qualidade dos dados</h3>
-    <p class="nota" style="margin:0 0 8px">Contas: A = ${cA}, B = ${cB}${Math.abs(cA - cB) <= 1 ? '' : ' (desequilibrado)'} ·
-      sem leituras: ${q.contas_sem_leituras ?? 0}</p>
-    <div class="tabela-scroll"><table>
-      <thead><tr><th>Leitura</th><th class="n">A</th><th class="n">B</th><th class="n">Sem grupo</th></tr></thead>
-      <tbody>${linhas}<tr><td><strong>Total</strong></td>${['A', 'B', 'G'].map((g) => `<td class="n"><strong>${tot(g)}</strong></td>`).join('')}</tr></tbody>
-    </table></div>
-    <p class="nota" style="margin:8px 0 0">Muitos "rápido demais" ou "QR 2× seguidas" = regras mal percebidas.</p>
-  </div>`;
+// ---------------------------------------------------------------------
+// Gráficos (SVG, sem bibliotecas). Desenhados à largura real do cartão.
+// ---------------------------------------------------------------------
+let observador = null;
+function montarGraficos(defs) {
+  observador?.disconnect();
+  const desenhar = (el) => {
+    const w = Math.floor(el.clientWidth);
+    if (!w || Number(el.dataset.w) === w) return;
+    el.dataset.w = w;
+    el.innerHTML = defs[el.dataset.grafico]?.(w) ?? '';
+  };
+  observador = typeof ResizeObserver === 'function' ? new ResizeObserver((en) => en.forEach((x) => desenhar(x.target))) : null;
+  ecra.querySelectorAll('[data-grafico]').forEach((el) => { observador?.observe(el); desenhar(el); });
 }
 
+/** Passo "redondo" para o eixo y. */
+function eixo(max, inteiro = true, ticks = 4) {
+  const m = Math.max(max, inteiro ? 1 : 0.5);
+  const bruto = m / ticks;
+  const mag = 10 ** Math.floor(Math.log10(bruto));
+  let passo = (inteiro ? [1, 2, 5, 10] : [1, 2, 2.5, 5, 10]).map((k) => k * mag).find((p) => p >= bruto - 1e-9);
+  if (inteiro) passo = Math.max(1, Math.round(passo));
+  return { passo, topo: Math.ceil(m / passo - 1e-9) * passo };
+}
+
+const svg = (w, h, corpo, rotulo) =>
+  `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(rotulo)}">${corpo}</svg>`;
+
+function grelhaY(m, w, ih, topo, passo, fmt) {
+  let s = '';
+  for (let i = 0; i * passo <= topo + 1e-9; i++) {
+    const v = i * passo, yy = m.t + ih - (v / topo) * ih;
+    s += `<line class="grade" x1="${m.l}" x2="${w - m.r}" y1="${yy}" y2="${yy}"/>
+      <text class="eixo" x="${m.l - 8}" y="${yy + 4}" text-anchor="end">${fmt(v)}</text>`;
+  }
+  return s;
+}
+
+/** Coluna com o topo arredondado (4px) e a base direita. */
+function coluna(x, yt, yb, w, cor) {
+  const h = yb - yt;
+  if (h <= 0.5) return '';
+  const r = Math.min(4, w / 2, h);
+  return `<path d="M${x},${yb}V${yt + r}Q${x},${yt} ${x + r},${yt}H${x + w - r}Q${x + w},${yt} ${x + w},${yt + r}V${yb}Z" fill="${cor}"/>`;
+}
+
+/** Colunas agrupadas (A e B lado a lado, 2px de intervalo). cats = [{ rot, v: {A, B}, tip }] */
+function svgColunas(w, cats, { series = SERIES, h = 220, inteiro = true, minEsp = 44, vazio = '' } = {}) {
+  if (!cats.length || cats.every((c) => series.every((s) => !c.v[s.id]))) return `<p class="muted vazio">${vazio}</p>`;
+  const m = { t: 12, r: 4, b: 26, l: 34 };
+  const iw = w - m.l - m.r, ih = h - m.t - m.b;
+  const max = Math.max(0, ...cats.flatMap((c) => series.map((s) => c.v[s.id] || 0)));
+  const { passo, topo } = eixo(max, inteiro);
+  const y = (v) => m.t + ih - (v / topo) * ih;
+  const bw = iw / cats.length, k = series.length;
+  const barra = Math.max(2, Math.min(24, (bw * 0.72 - (k - 1) * 2) / k));
+  const gw = k * barra + (k - 1) * 2;
+  const cada = Math.ceil(cats.length / Math.max(1, Math.floor(iw / minEsp)));
+  let s = grelhaY(m, w, ih, topo, passo, (v) => ui.fmt(v, inteiro ? 0 : 1));
+  cats.forEach((c, i) => {
+    const x0 = m.l + bw * i;
+    s += `<g class="alvo" data-tip="${esc(c.tip)}"><rect class="faixa" x="${x0}" y="${m.t}" width="${bw}" height="${ih}" rx="6"/>`;
+    series.forEach((se, j) => { s += coluna(x0 + (bw - gw) / 2 + j * (barra + 2), y(c.v[se.id] || 0), y(0), barra, se.cor); });
+    s += '</g>';
+    if (i % cada === 0) s += `<text class="eixo" x="${x0 + bw / 2}" y="${h - 8}" text-anchor="middle">${esc(c.rot)}</text>`;
+  });
+  return svg(w, h, s, 'Gráfico de colunas, A e B');
+}
+
+/** Linhas (2px) com marcadores; a mira vertical encontra o ponto mais próximo no eixo x. */
+function svgLinhas(w, xs, series, { h = 220, inteiro = true, minEsp = 44, tips = [] } = {}) {
+  const n = xs.length;
+  if (!n) return '<p class="muted vazio">O gráfico aparece quando o estudo começar.</p>';
+  const m = { t: 12, r: 14, b: 26, l: 34 };
+  const iw = w - m.l - m.r, ih = h - m.t - m.b;
+  const max = Math.max(0, ...series.flatMap((s) => s.valores.filter((v) => v != null)));
+  const { passo, topo } = eixo(max, inteiro);
+  const x = (i) => m.l + (n === 1 ? iw / 2 : (i * iw) / (n - 1));
+  const y = (v) => m.t + ih - (v / topo) * ih;
+  const passoX = n === 1 ? iw : iw / (n - 1);
+  const cada = Math.ceil(n / Math.max(1, Math.floor(iw / minEsp)));
+  let s = grelhaY(m, w, ih, topo, passo, (v) => ui.fmt(v, inteiro ? 0 : 1));
+  for (let i = 0; i < n; i++) {
+    // Zona de toque: metade do intervalo para cada lado, sem sair da área do gráfico.
+    const x0 = Math.max(m.l, x(i) - passoX / 2), x1 = Math.min(w - m.r, x(i) + passoX / 2);
+    s += `<g class="alvo" data-tip="${esc(tips[i] ?? '')}"><rect x="${x0}" y="${m.t}" width="${x1 - x0}" height="${ih}" fill="transparent"/>
+      <line class="mira" x1="${x(i)}" x2="${x(i)}" y1="${m.t}" y2="${m.t + ih}"/></g>`;
+    if (i % cada === 0 || i === n - 1) s += `<text class="eixo" x="${x(i)}" y="${h - 8}" text-anchor="middle">${esc(xs[i])}</text>`;
+  }
+  let marcas = '';
+  series.forEach((se) => {
+    let d = '', caneta = false;
+    se.valores.forEach((v, i) => {
+      if (v == null) { caneta = false; return; }
+      d += `${caneta ? 'L' : 'M'}${x(i)},${y(v)}`; caneta = true;
+    });
+    marcas += `<path d="${d}" fill="none" stroke="${se.cor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    se.valores.forEach((v, i) => {
+      if (v == null || (n > 16 && i !== n - 1)) return;
+      marcas += `<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="${se.cor}" stroke="var(--superficie)" stroke-width="2"/>`;
+    });
+  });
+  return svg(w, h, `${s}<g pointer-events="none">${marcas}</g>`, 'Gráfico de linhas');
+}
+
+/** Um ponto por pessoa (empates empilhados na vertical) e um traço na média de cada grupo. */
+function svgPontos(w, grupos, { vazio = '', unidade = ['', ''] } = {}) {
+  if (grupos.every((g) => !g.pontos.length)) return `<p class="muted vazio">${vazio}</p>`;
+  const linhaH = 64, m = { t: 6, r: 16, b: 26, l: Math.min(110, w * 0.28) };
+  const h = m.t + grupos.length * linhaH + m.b, iw = w - m.l - m.r;
+  const max = Math.max(1, ...grupos.flatMap((g) => g.pontos.map((p) => p.v)));
+  const { passo, topo } = eixo(max, true, Math.max(2, Math.min(6, Math.floor(iw / 50))));
+  const x = (v) => m.l + (v / topo) * iw;
+  let s = '';
+  for (let i = 0; i * passo <= topo; i++) {
+    const v = i * passo;
+    s += `<line class="grade" x1="${x(v)}" x2="${x(v)}" y1="${m.t}" y2="${h - m.b}"/>
+      <text class="eixo" x="${x(v)}" y="${h - 8}" text-anchor="middle">${v}</text>`;
+  }
+  grupos.forEach((g, gi) => {
+    const cy = m.t + gi * linhaH + linhaH / 2;
+    s += `<circle cx="7" cy="${cy}" r="5" fill="${g.cor}"/><text class="rot" x="18" y="${cy + 4}">${esc(g.nome.split(' · ')[0])}</text>
+      <text class="eixo" x="18" y="${cy + 18}">n = ${g.pontos.length}</text>`;
+    const porValor = new Map();
+    g.pontos.forEach((p) => porValor.set(p.v, [...(porValor.get(p.v) || []), p]));
+    const maxEmp = Math.max(1, ...[...porValor.values()].map((l) => l.length));
+    const esp = Math.min(10, (linhaH - 16) / maxEmp);
+    porValor.forEach((lista, v) => lista.forEach((p, j) => {
+      const cyp = cy + (j % 2 ? 1 : -1) * Math.ceil(j / 2) * esp;
+      s += `<g class="alvo" data-tip="${esc(dicaHtml(p.id, [{ cor: g.cor, valor: v, txt: `${v === 1 ? unidade[0] : unidade[1]} · ${g.id}` }]))}">
+        <circle cx="${x(v)}" cy="${cyp}" r="12" fill="transparent"/>
+        <circle class="ponto" cx="${x(v)}" cy="${cyp}" r="4.5" fill="${g.cor}" stroke="var(--superficie)" stroke-width="2"/></g>`;
+    }));
+    const md = media(g.pontos.map((p) => p.v));
+    if (Number.isFinite(md)) {
+      s += `<line x1="${x(md)}" x2="${x(md)}" y1="${cy - linhaH / 2 + 6}" y2="${cy + linhaH / 2 - 6}" stroke="var(--texto)" stroke-width="2" stroke-linecap="round" pointer-events="none"/>`;
+    }
+  });
+  return svg(w, h, s, 'Um ponto por pessoa, A e B');
+}
+
+/** Dica que segue o rato sobre qualquer elemento com data-tip. */
+function ligarDicas(raiz) {
+  if (!raiz) return;
+  let ativo = null;
+  const esconder = () => { dica.hidden = true; ativo?.classList.remove('ativo'); ativo = null; };
+  raiz.addEventListener('pointermove', (ev) => {
+    const a = ev.target.closest('[data-tip]');
+    if (!a || !a.dataset.tip) return esconder();
+    if (a !== ativo) { ativo?.classList.remove('ativo'); ativo = a; a.classList.add('ativo'); dica.innerHTML = a.dataset.tip; }
+    dica.hidden = false;
+    const bw = dica.offsetWidth, bh = dica.offsetHeight;
+    let px = ev.clientX + 14, py = ev.clientY - bh - 12;
+    if (px + bw > innerWidth - 8) px = ev.clientX - bw - 14;
+    if (py < 8) py = ev.clientY + 18;
+    dica.style.transform = `translate(${Math.max(8, px)}px, ${py}px)`;
+  });
+  raiz.addEventListener('pointerleave', esconder);
+  addEventListener('scroll', esconder, { passive: true });
+}
+
+// ---------------------------------------------------------------------
+// CSV
+// ---------------------------------------------------------------------
+function csv(linhas) {
+  const escCsv = (v) => (v == null ? '' : /[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+  return '﻿' + linhas.map((l) => l.map(escCsv).join(',')).join('\r\n');
+}
+function csvParticipantes(d) {
+  const n = d.estudo.semanas;
+  const cab = ['participante', 'variante', 'tem_conta', 'ex_convidado', 'primeiro_dia', 'leituras', 'subidas_validas', 'andares',
+    'dias_diferentes', 'subidas_7d', 'repetidas_7d', 'janela_7d_completa', 'semanas_expostas', 'subidas_por_semana', 'meta_semanal',
+    ...Array.from({ length: n }, (_, k) => `semana_${k + 1}`)];
+  const rows = d.participantes.map((l) => [l.id, l.variante, l.tem_conta ? 'sim' : 'nao', l.ex_convidado ? 'sim' : 'nao', l.primeiro_dia, l.n_scans, l.subidas, l.andares,
+    l.dias, l.subidas_7d, Math.max(0, l.subidas_7d - 1), janelaCompleta(l, d.estudo) ? 'sim' : 'nao', l.semanas_expostas,
+    (l.subidas / Math.max(1, l.semanas_expostas)).toFixed(3), l.meta_semanal ?? '', ...l.por_semana]);
+  return csv([cab, ...rows]);
+}
 function csvDiario(d) {
   return csv([['dia', 'A_subidas', 'A_pessoas', 'B_subidas', 'B_pessoas', 'sem_conta_subidas', 'sem_conta_pessoas'],
     ...d.diario.map((x) => [x.dia, x.A, x.A_pessoas, x.B, x.B_pessoas, x.G ?? 0, x.G_pessoas ?? 0])]);
