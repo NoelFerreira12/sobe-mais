@@ -1,6 +1,7 @@
-import { CONFIG } from '../../config.js?v=202611201247';
-import { rpc } from './api.js?v=202611201247';
-import * as ui from './ui.js?v=202611201247';
+import { CONFIG } from '../../config.js?v=202611241451';
+import { rpc } from './api.js?v=202611241451';
+import * as ui from './ui.js?v=202611241451';
+import { metros, progressoRota } from './calc.js?v=202611241451';
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
@@ -93,8 +94,13 @@ function mostrarLogin(erro = '') {
 
 async function entrar(pw) {
   ecra.innerHTML = '<div class="carregar"><div class="roda"></div><span>A carregar…</span></div>';
-  let r;
-  try { r = await rpc('painel', { p_password: pw, p_incluir_fora: comTestes() }); } catch (e) {
+  let r, coletivo;
+  try {
+    [r, coletivo] = await Promise.all([
+      rpc('painel', { p_password: pw, p_incluir_fora: comTestes() }),
+      rpc('progresso_coletivo').catch((e) => { console.error(e); return null; }),
+    ]);
+  } catch (e) {
     console.error(e); return mostrarLogin('Sem ligação ao servidor. Tenta outra vez.');
   }
   if (!r.ok) {
@@ -103,7 +109,7 @@ async function entrar(pw) {
       ? 'Demasiadas tentativas falhadas. Espera 15 minutos.' : 'Password incorreta.');
   }
   try { sessionStorage.setItem(CHAVE, pw); } catch { /* */ }
-  mostrarPainel(r);
+  mostrarPainel({ ...r, coletivo });
 }
 
 // ---------------------------------------------------------------------
@@ -176,6 +182,8 @@ function mostrarPainel(d) {
         <div class="nota">${d.convidados?.ids ?? 0} IDs sem conta de antes do sorteio para todos · ${d.convidados?.subidas ?? 0} subidas válidas (contam para o total coletivo) · ${d.contas ?? 0} contas criadas</div>
       </section>
     </div>
+
+    ${cartaoMeta(d.coletivo)}
 
     <section class="cartao">
       <h2>Comparação A vs B</h2>
@@ -353,6 +361,44 @@ function csvParticipantes(d) {
     (l.subidas / Math.max(1, l.semanas_expostas)).toFixed(3), l.meta_semanal ?? '', ...l.por_semana]);
   return csv([cab, ...rows]);
 }
+/** Meta coletiva tal como está agora na app (o mesmo que a versão A vê no telemóvel). */
+function cartaoMeta(c) {
+  if (!c) return '';
+  const rota = CONFIG.rotaColetiva;
+  const total = metros(c.lancos);
+  const p = progressoRota(total, rota);
+  const topo = p.topo;
+  const ticks = p.marcos.filter((m) => m !== topo)
+    .map((m) => `<i style="left:${(m.altitude / topo.altitude) * 100}%" title="${m.nome}"></i>`).join('');
+  const lista = p.marcos.map((m) => {
+    const cls = m.altitude <= p.atual ? 'feito' : (m === p.proximo ? 'proximo' : '');
+    return `<li class="${cls}"><span>${m.nome}</span><span class="num" style="font-weight:700">${ui.fmt(m.altitude)} m</span></li>`;
+  }).join('');
+  const proximo = p.proximo === topo
+    ? `Próxima meta: <strong>${topo.nome}</strong>, o topo. Faltam <strong>${ui.fmt(p.falta, 1)} m</strong>.`
+    : `Próxima meta: <strong>${p.proximo.nome}</strong> (${ui.fmt(p.proximo.altitude)} m). Faltam <strong>${ui.fmt(p.falta, 1)} m</strong>.`;
+  const feitos = p.marcos.filter((m) => m.altitude <= p.atual).length;
+  return `<section class="cartao">
+    <h2>Meta coletiva (o que a versão A vê agora)</h2>
+    <span class="etiqueta">${rota.titulo}</span>
+    ${p.voltas >= 1 ? `<p style="margin:8px 0 0"><strong>${p.subidaN}.ª subida ao ${topo.nome}.</strong> A contagem recomeçou.</p>` : ''}
+    <div style="margin:10px 0 12px"><span class="metros-grande num">${ui.fmt(p.atual, 1)}</span>
+      <span class="muted"> m de ${ui.fmt(topo.altitude)} m</span></div>
+    <div class="barra" role="progressbar" aria-label="${rota.titulo}"
+      aria-valuemin="0" aria-valuemax="${topo.altitude}" aria-valuenow="${Math.round(p.atual)}">
+      <span style="width:${p.pct * 100}%"></span></div>
+    <div class="marcos" aria-hidden="true">${ticks}</div>
+    <p style="margin:0 0 6px">${proximo}</p>
+    <p class="nota" style="margin:0">${ui.fmt(c.subidas)} ${c.subidas === 1 ? 'subida' : 'subidas'} de ${ui.fmt(c.pessoas)}
+      ${c.pessoas === 1 ? 'pessoa' : 'pessoas'} · ${ui.fmt(total, 1)} m no total · ${feitos} de ${p.marcos.length} metas.
+      Conta todas as leituras válidas (todos os grupos, também as de teste), tal como aparece na app.</p>
+    <details class="mais-metas" style="margin-top:8px">
+      <summary><span>Ver todas as metas</span></summary>
+      <ul class="lista-marcos">${lista}</ul>
+    </details>
+  </section>`;
+}
+
 /** Qualidade dos dados: ajuda a perceber se as pessoas estão a perceber as regras. */
 function cartaoQualidade(d) {
   const q = d.qualidade;
