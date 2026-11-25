@@ -10,7 +10,7 @@ const consultas = {
   pisos: `select piso, codigo, token from public.pisos order by piso`,
   contas: `select user_id, utilizador, ex_convidado, criado_em from public.contas order by criado_em`,
   participantes: `select user_id, variante, meta_semanal, criado_em from public.participantes order by criado_em`,
-  scans: `select id, user_id, piso, variante, criado_em, resultado, piso_origem, andares, segundos, no_estudo
+  scans: `select id, user_id, piso, variante, criado_em, resultado, piso_origem, andares, segundos, no_estudo, manual
           from public.scans order by id`,
 };
 

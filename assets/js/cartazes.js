@@ -1,6 +1,6 @@
-import { CONFIG } from '../../config.js?v=202611241645';
-import { rpc } from './api.js?v=202611241645';
-import * as ui from './ui.js?v=202611241645';
+import { CONFIG } from '../../config.js?v=202611251459';
+import { rpc } from './api.js?v=202611251459';
+import * as ui from './ui.js?v=202611251459';
 
 const controlo = document.getElementById('controlo');
 const folhas = document.getElementById('folhas');

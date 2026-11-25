@@ -1,9 +1,9 @@
-import { CONFIG } from '../../config.js?v=202611241645';
-import { rpc } from './api.js?v=202611241645';
-import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js?v=202611241645';
-import { resumo, metros, metrosSubida, progressoRota } from './calc.js?v=202611241645';
-import * as ui from './ui.js?v=202611241645';
-import { lerQR } from './leitor.js?v=202611241645';
+import { CONFIG } from '../../config.js?v=202611251459';
+import { rpc } from './api.js?v=202611251459';
+import { lerId, definirId, esquecerId, criarId, lerTipo } from './id.js?v=202611251459';
+import { resumo, metros, metrosSubida, progressoRota } from './calc.js?v=202611251459';
+import * as ui from './ui.js?v=202611251459';
+import { lerQR } from './leitor.js?v=202611251459';
 
 const botaoLer = (txt = 'Ler QR do piso', cls = '') =>
   `<button class="btn ${cls}" type="button" data-ler>${ui.ICONES.qr}<span>${txt}</span></button>`;

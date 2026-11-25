@@ -1,7 +1,7 @@
-import { CONFIG } from '../../config.js?v=202611241645';
-import { rpc } from './api.js?v=202611241645';
-import * as ui from './ui.js?v=202611241645';
-import { metros, progressoRota } from './calc.js?v=202611241645';
+import { CONFIG } from '../../config.js?v=202611251459';
+import { rpc } from './api.js?v=202611251459';
+import * as ui from './ui.js?v=202611251459';
+import { metros, progressoRota } from './calc.js?v=202611251459';
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
@@ -189,6 +189,8 @@ const SERIES = [
   { id: 'A', nome: 'A · coletivo', cor: 'var(--serie-a)' },
   { id: 'B', nome: 'B · pessoal', cor: 'var(--serie-b)' },
 ];
+// Toda a gente: A, B e os antigos "sem grupo" (fora da comparação A/B, mas contam no total).
+const SERIES3 = [...SERIES, { id: 'G', nome: 'Sem grupo', cor: 'var(--neutro-forte)' }];
 const DIAS_SEMANA = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 function mostrarPainel(d) {
@@ -196,18 +198,21 @@ function mostrarPainel(d) {
   const semEx = excluirEx();
   const nEx = { A: 0, B: 0 };
   d.participantes.forEach((l) => { if (l.ex_convidado && l.subidas >= 1 && nEx[l.variante] != null) nEx[l.variante]++; });
-  // Análise A/B: só A e B. Os antigos "sem grupo" (G) ficam sempre de fora.
+  // Comparação A/B (H1, tabela A vs B): só A e B. O resto do painel mostra toda a gente.
   const L = d.participantes.filter((l) => (l.variante === 'A' || l.variante === 'B') && !(semEx && l.ex_convidado));
   const e = d.estudo;
-  const A = grupo(L, 'A', e), B = grupo(L, 'B', e);
-  const G = { A, B };
+  const A = grupo(L, 'A', e), B = grupo(L, 'B', e), S = grupo(d.participantes, 'G', e);
+  const G = { A, B, G: S };
+  const grupos = [A, B, S];
+  const todos = [...A.part, ...B.part, ...S.part]; // toda a gente com pelo menos 1 subida válida
   const total = A.n + B.n;
   const obj = CONFIG.objetivoParticipantes, min = CONFIG.minimoParticipantes;
   const diasEstudo = diasEntre(e.inicio, e.fim) + 1;
   const diaAtual = Math.max(0, Math.min(diasEstudo, diasEntre(e.inicio, e.hoje) + 1));
   const estado = e.hoje < e.inicio ? `começa a ${dataPt(e.inicio)}` : e.hoje > e.fim ? 'terminado' : `dia ${diaAtual} de ${diasEstudo}`;
+  const taxaDe = (l) => l.subidas / Math.max(1, l.semanas_expostas);
 
-  // Testes
+  // Testes (só A vs B)
   const tH1 = teste(A.rep7, B.rep7), tSub7 = teste(A.sub7, B.sub7), tTaxa = teste(A.taxa, B.taxa);
   const tDias = teste(A.dias, B.dias), tAnd = teste(A.andares, B.andares);
   const fVolta = fisher(A.voltaram, A.n, B.voltaram, B.n);
@@ -216,9 +221,9 @@ function mostrarPainel(d) {
     : tH1.r.p < 0.05 ? 'A repete mais do que B'
     : e.hoje > e.fim ? 'Sem diferença significativa' : 'Ainda sem diferença significativa';
 
-  // Leituras (podem faltar se o pedido falhou)
-  const exIds = new Set(d.participantes.filter((l) => l.ex_convidado).map((l) => l.id));
-  const lv = (d.leituras || []).filter((x) => (x.variante === 'A' || x.variante === 'B') && !(semEx && exIds.has(x.participante)));
+  // Leituras de toda a gente (as de A/B excluídas pelo filtro ficam de fora). Podem faltar se o pedido falhou.
+  const exIds = new Set(d.participantes.filter((l) => l.ex_convidado && l.variante !== 'G').map((l) => l.id));
+  const lv = (d.leituras || []).filter((x) => !(semEx && exIds.has(x.participante)));
   const validas = lv.filter((x) => x.resultado === 'valida');
 
   const mm = (a) => `${f1(media(a), 1)} / ${f1(mediana(a), 1)}`;
@@ -229,6 +234,9 @@ function mostrarPainel(d) {
       <td class="n">${pc(mw ? t.r : t)}</td><td class="n">${mw ? efTxt(t.ef) : ''}</td></tr>`;
   };
   const prop = (k, n) => (n ? `${pct(k / n)} <span class="nota">(${k}/${n})</span>` : '—');
+  const porGrupo = (f) => `A ${f(A)} · B ${f(B)} · sem grupo ${f(S)}`;
+  const rec = recrutamento(d.diario, grupos);
+  const sem = semanas(e, grupos);
 
   ecra.innerHTML = `
   <div class="dash">
@@ -253,17 +261,19 @@ function mostrarPainel(d) {
     ${d.inclui_fora ? '<p class="aviso-caixa largo-total" style="margin:0"><strong>A mostrar leituras de teste.</strong> Não usar estes números na análise.</p>' : ''}
 
     <div class="kpis">
-      ${kpi('Participantes', `${total}<span class="de"> / ${obj}</span>`,
+      ${kpi('Toda a gente', `${todos.length}<span class="de"> ${todos.length === 1 ? 'pessoa' : 'pessoas'}</span>`,
+        `${porGrupo((g) => g.n)} · ${d.participantes.length} leram QR`)}
+      ${kpi('Subidas válidas', ui.fmt(A.subidas + B.subidas + S.subidas), porGrupo((g) => ui.fmt(g.subidas)))}
+      ${kpi('Participantes A/B', `${total}<span class="de"> / ${obj}</span>`,
         total >= min ? `Mínimo de ${min} atingido` : `Faltam ${min - total} para o mínimo (${min})`, total / obj)}
-      ${kpi('Subidas válidas', ui.fmt(A.subidas + B.subidas), `A ${ui.fmt(A.subidas)} · B ${ui.fmt(B.subidas)}`)}
-      ${kpi('Voltaram a subir', pct((A.voltaram + B.voltaram) / total), 'Subiram em 2 ou mais dias')}
-      ${kpi('Subidas por pessoa/semana', f1(media([...A.taxa, ...B.taxa]), 1), `A ${f1(media(A.taxa), 1)} · B ${f1(media(B.taxa), 1)}`)}
+      ${kpi('Voltaram a subir', pct(todos.filter((l) => l.dias >= 2).length / todos.length), 'Subiram em 2 ou mais dias (toda a gente)')}
+      ${kpi('Subidas por pessoa/semana', f1(media(todos.map(taxaDe)), 1), porGrupo((g) => f1(media(g.taxa), 1)))}
       ${kpi('Estudo', `${diaAtual}<span class="de"> / ${diasEstudo} dias</span>`, `Termina a ${dataPt(e.fim)}`, diaAtual / diasEstudo)}
     </div>
 
     <section class="cartao s5">
       <h2>H1 · subidas repetidas na 1.ª semana</h2>
-      <p class="sub">A versão coletiva (A) faz repetir mais do que a pessoal (B)?</p>
+      <p class="sub">A versão coletiva (A) faz repetir mais do que a pessoal (B)? Só A e B.</p>
       <div class="duelo">
         ${SERIES.map((s) => `<div><span class="chave"><i style="background:${s.cor}"></i>${s.nome}</span>
           <span class="valor">${Number.isFinite(media(G[s.id].rep7))
@@ -272,12 +282,12 @@ function mostrarPainel(d) {
       <p class="veredito"><strong>${veredito}</strong><br>
         <span class="nota">${fp(tH1.r)} · efeito ${efTxt(tH1.ef)}${efNome(tH1.ef) ? ` (${efNome(tH1.ef)})` : ''}</span></p>
       <div class="grafico" data-grafico="h1"></div>
-      <p class="nota" style="margin:6px 0 0">Cada ponto é uma pessoa com a 1.ª semana completa. O traço é a média.</p>
+      <p class="nota" style="margin:6px 0 0">Cada ponto é uma pessoa com a 1.ª semana completa (1.ª leitura há mais de 7 dias). O traço é a média.</p>
     </section>
 
     <section class="cartao s7">
       <h2>A vs B</h2>
-      <p class="sub">Média / mediana por pessoa</p>
+      <p class="sub">Comparação do estudo: só A e B. Média / mediana por pessoa.</p>
       <div class="tabela-scroll"><table>
         <thead><tr><th></th><th class="n">${chave('A')}A</th><th class="n">${chave('B')}B</th><th class="n">p</th><th class="n">efeito</th></tr></thead>
         <tbody>
@@ -295,52 +305,54 @@ function mostrarPainel(d) {
     </section>
 
     <section class="cartao s12">
-      <div class="titulo-linha"><h2>Subidas válidas por dia</h2>${legenda(SERIES)}</div>
+      <div class="titulo-linha"><h2>Subidas válidas por dia</h2>${legenda(SERIES3)}</div>
       <div class="grafico" data-grafico="dia"></div>
-      ${vista(['Dia', 'A', 'A pessoas', 'B', 'B pessoas', 'Sem grupo'],
-        d.diario.map((x) => [dataPt(x.dia), x.A, x.A_pessoas, x.B, x.B_pessoas, x.G ?? 0]))}
+      ${vista(['Dia', 'A', 'A pessoas', 'B', 'B pessoas', 'Sem grupo', 'Sem grupo pessoas'],
+        d.diario.map((x) => [dataPt(x.dia), x.A, x.A_pessoas, x.B, x.B_pessoas, x.G ?? 0, x.G_pessoas ?? 0]))}
     </section>
 
+    ${cartaoPessoas(d, semEx)}
+
     <section class="cartao s6">
-      <div class="titulo-linha"><h2>Participantes ao longo do estudo</h2>${legenda([...SERIES, TOTAL], 'linha')}</div>
+      <div class="titulo-linha"><h2>Pessoas ao longo do estudo</h2>${legenda(SERIES3, 'linha')}</div>
       <div class="grafico" data-grafico="recrutamento"></div>
-      ${vista(['Dia', 'A', 'B', 'Total'], recrutamento(d.diario, A, B).map((x) => [dataPt(x.dia), x.A, x.B, x.A + x.B]))}
+      ${vista(['Dia', 'A', 'B', 'Sem grupo', 'Total'], rec.map((x) => [dataPt(x.dia), x.A, x.B, x.G, x.A + x.B + x.G]))}
     </section>
 
     <section class="cartao s6">
-      <div class="titulo-linha"><h2>Subidas por pessoa, por semana</h2>${legenda(SERIES, 'linha')}</div>
+      <div class="titulo-linha"><h2>Subidas por pessoa, por semana</h2>${legenda(SERIES3, 'linha')}</div>
       <div class="grafico" data-grafico="semanas"></div>
-      ${vista(['Semana', 'A média', 'A n', 'B média', 'B n'], semanas(e, A, B).map((s) =>
-        [`${s.rot} (${dataPt(s.ini)}–${dataPt(s.fim)})`, f1(s.A, 2), s.nA, f1(s.B, 2), s.nB]))}
+      ${vista(['Semana', 'A média', 'A n', 'B média', 'B n', 'Sem grupo média', 'Sem grupo n'], sem.map((s) =>
+        [`${s.rot} (${dataPt(s.ini)}–${dataPt(s.fim)})`, f1(s.A, 2), s.nA, f1(s.B, 2), s.nB, f1(s.G, 2), s.nG]))}
     </section>
 
     <section class="cartao s6">
-      <div class="titulo-linha"><h2>A que horas sobem</h2>${legenda(SERIES)}</div>
+      <div class="titulo-linha"><h2>A que horas sobem</h2>${legenda(SERIES3)}</div>
       <div class="grafico" data-grafico="horas"></div>
-      ${d.leituras ? vista(['Hora', 'A', 'B'], porHora(validas).map((x) => [x.rot, x.v.A, x.v.B])) : ''}
+      ${d.leituras ? vista(['Hora', 'A', 'B', 'Sem grupo'], porHora(validas).map((x) => [x.rot, x.v.A, x.v.B, x.v.G])) : ''}
     </section>
 
     <section class="cartao s6">
-      <div class="titulo-linha"><h2>Dia da semana</h2>${legenda(SERIES)}</div>
+      <div class="titulo-linha"><h2>Dia da semana</h2>${legenda(SERIES3)}</div>
       <div class="grafico" data-grafico="semana"></div>
-      ${d.leituras ? vista(['Dia', 'A', 'B'], porDiaSemana(validas).map((x) => [x.rot, x.v.A, x.v.B])) : ''}
+      ${d.leituras ? vista(['Dia', 'A', 'B', 'Sem grupo'], porDiaSemana(validas).map((x) => [x.rot, x.v.A, x.v.B, x.v.G])) : ''}
     </section>
 
     <section class="cartao s6">
-      <div class="titulo-linha"><h2>Quantas vezes cada pessoa subiu</h2>${legenda(SERIES)}</div>
+      <div class="titulo-linha"><h2>Quantas vezes cada pessoa subiu</h2>${legenda(SERIES3)}</div>
       <div class="grafico" data-grafico="distribuicao"></div>
-      ${vista(['Subidas', 'Pessoas A', 'Pessoas B'], distribuicao(A, B).map((x) => [x.rot, x.v.A, x.v.B]))}
+      ${vista(['Subidas', 'Pessoas A', 'Pessoas B', 'Pessoas sem grupo'], distribuicao(grupos).map((x) => [x.rot, x.v.A, x.v.B, x.v.G]))}
     </section>
 
     <section class="cartao s6">
       <h2>Meta semanal</h2>
-      <p class="sub">É igual nas duas versões: serve para ver se explica diferenças entre A e B.</p>
+      <p class="sub">É igual em todas as versões: serve para ver se explica diferenças entre A e B.</p>
       <div class="tabela-scroll"><table>
-        <thead><tr><th></th><th class="n">${chave('A')}A</th><th class="n">${chave('B')}B</th></tr></thead>
+        <thead><tr><th></th><th class="n">${chave('A')}A</th><th class="n">${chave('B')}B</th><th class="n"><i class="chave-cor" style="background:var(--neutro-forte)"></i>Sem grupo</th></tr></thead>
         <tbody>
-          <tr><td>Escolheram uma meta</td><td class="n">${prop(A.nMeta, A.n)}</td><td class="n">${prop(B.nMeta, B.n)}</td></tr>
-          <tr><td>Meta média (vezes/semana)</td><td class="n">${f1(A.metaMedia, 1)}</td><td class="n">${f1(B.metaMedia, 1)}</td></tr>
-          <tr><td>Cumpriram pelo menos 1 semana</td><td class="n">${prop(A.cumpriu, A.nMeta)}</td><td class="n">${prop(B.cumpriu, B.nMeta)}</td></tr>
+          <tr><td>Escolheram uma meta</td>${grupos.map((g) => `<td class="n">${prop(g.nMeta, g.n)}</td>`).join('')}</tr>
+          <tr><td>Meta média (vezes/semana)</td>${grupos.map((g) => `<td class="n">${f1(g.metaMedia, 1)}</td>`).join('')}</tr>
+          <tr><td>Cumpriram pelo menos 1 semana</td>${grupos.map((g) => `<td class="n">${prop(g.cumpriu, g.nMeta)}</td>`).join('')}</tr>
         </tbody>
       </table></div>
     </section>
@@ -349,7 +361,7 @@ function mostrarPainel(d) {
 
     <section class="cartao s6">
       <h2>Percursos mais comuns</h2>
-      <p class="sub">Subidas válidas, do piso de partida ao de chegada</p>
+      <p class="sub">Subidas válidas de toda a gente, do piso de partida ao de chegada</p>
       ${percursos(validas, d.leituras)}
     </section>
 
@@ -357,7 +369,7 @@ function mostrarPainel(d) {
 
     <section class="cartao s6">
       <h2>Exportar CSV</h2>
-      <p class="sub">Anónimo: P001, P002… (iguais nos três ficheiros)</p>
+      <p class="sub">Anónimo: P001, P002… (iguais nos três ficheiros). Têm toda a gente, incluindo “sem grupo”.</p>
       <div class="botoes">
         <button class="btn pequeno" id="csv-part">Participantes</button>
         <button class="btn pequeno" id="csv-dia">Dias</button>
@@ -365,11 +377,12 @@ function mostrarPainel(d) {
       </div>
       <details class="como" style="margin-top:14px"><summary>Como se calcula</summary>
         <ul class="nota">
-          <li>Participante = pelo menos 1 subida válida. Os antigos “sem grupo” (${d.convidados?.com_subida ?? 0} pessoas,
-            ${d.convidados?.subidas ?? 0} subidas) ficam fora do A/B.</li>
+          <li>Toda a gente = quem tem pelo menos 1 subida válida (A, B e sem grupo). Participantes A/B = só A e B:
+            é com eles que se faz o H1 e a tabela A vs B. “Sem grupo” = quem usou sem conta antes de 20/11 (via o coletivo).</li>
           <li>1.ª semana = 7 dias desde a 1.ª leitura; só conta quem a completou até ${dataPt(e.fim)}.
             Repetidas = subidas nessa semana menos a primeira.</li>
           <li>Subidas por semana = subidas ÷ semanas desde a 1.ª leitura (mínimo 1).</li>
+          <li>Ler o QR em cada piso seguido é uma só subida (com mais andares), não várias.</li>
           <li>Regras: ${d.regras.min_seg_por_andar}–${d.regras.max_seg_por_andar} s por andar,
             ${Math.round(d.regras.cooldown_seg / 60)} min entre subidas. Contas criadas: ${d.contas ?? 0}.</li>
           <li>Subidas registadas à mão: subidas reais em que a pessoa se esqueceu do QR. Contam como válidas
@@ -383,39 +396,30 @@ function mostrarPainel(d) {
   </div>`;
 
   // Gráficos: desenhados à largura real de cada cartão (e outra vez quando a janela muda).
+  const dd = (dia) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
   montarGraficos({
     h1: (w) => svgPontos(w, SERIES.map((s) => ({ ...s, pontos: G[s.id].h1.map((l) => ({ id: l.id, v: Math.max(0, l.subidas_7d - 1) })) })),
-      { vazio: 'Aparece quando houver pessoas com a 1.ª semana completa.', unidade: ['repetida', 'repetidas'] }),
+      { vazio: 'Aparece quando houver pessoas com a 1.ª semana completa (7 dias desde a 1.ª leitura).', unidade: ['repetida', 'repetidas'] }),
     dia: (w) => svgColunas(w, d.diario.map((x) => ({
-      rot: `${x.dia.slice(8, 10)}/${x.dia.slice(5, 7)}`, v: { A: x.A, B: x.B },
+      rot: dd(x.dia), v: { A: x.A, B: x.B, G: x.G ?? 0 },
       tip: dicaHtml(dataPt(x.dia), [
         { cor: 'var(--serie-a)', valor: x.A, txt: `A · ${x.A_pessoas} ${x.A_pessoas === 1 ? 'pessoa' : 'pessoas'}` },
         { cor: 'var(--serie-b)', valor: x.B, txt: `B · ${x.B_pessoas} ${x.B_pessoas === 1 ? 'pessoa' : 'pessoas'}` },
-        ...(x.G ? [{ cor: 'var(--neutro-forte)', valor: x.G, txt: 'sem grupo' }] : [])]),
-    })), { h: 240, vazio: 'O gráfico aparece quando o estudo começar.' }),
-    recrutamento: (w) => {
-      const r = recrutamento(d.diario, A, B);
-      return svgLinhas(w, r.map((x) => `${x.dia.slice(8, 10)}/${x.dia.slice(5, 7)}`), [...SERIES, TOTAL].map((s) => ({
-        ...s, valores: r.map((x) => (s.id === 'T' ? x.A + x.B : x[s.id])) })),
-      { tips: r.map((x) => dicaHtml(dataPt(x.dia), [
-        { cor: 'var(--serie-a)', valor: x.A, txt: 'A' }, { cor: 'var(--serie-b)', valor: x.B, txt: 'B' },
-        { cor: TOTAL.cor, valor: x.A + x.B, txt: 'total' }])) });
-    },
-    semanas: (w) => {
-      const s = semanas(e, A, B);
-      return svgLinhas(w, s.map((x) => x.rot), SERIES.map((se) => ({ ...se, valores: s.map((x) => x[se.id]) })), {
-        inteiro: false, minEsp: 30,
-        tips: s.map((x) => dicaHtml(`${x.rot}: ${dataPt(x.ini)}–${dataPt(x.fim)}`, [
-          { cor: 'var(--serie-a)', valor: f1(x.A, 2), txt: `A · n = ${x.nA}` },
-          { cor: 'var(--serie-b)', valor: f1(x.B, 2), txt: `B · n = ${x.nB}` }])) });
-    },
-    horas: (w) => (d.leituras ? svgColunas(w, porHora(validas).map((x) => ({ ...x, tip: dicaAB(`${x.rot}h`, x.v) })),
-      { vazio: 'Ainda sem subidas.', minEsp: 30 }) : semLeituras()),
-    semana: (w) => (d.leituras ? svgColunas(w, porDiaSemana(validas).map((x) => ({ ...x, tip: dicaAB(x.rot, x.v) })),
-      { vazio: 'Ainda sem subidas.', minEsp: 30 }) : semLeituras()),
-    distribuicao: (w) => svgColunas(w, distribuicao(A, B).map((x) => ({
-      ...x, tip: dicaAB(`${x.rot} ${x.rot === '1' ? 'subida' : 'subidas'}`, x.v, ['pessoa', 'pessoas']) })),
-    { vazio: 'Ainda sem participantes.', minEsp: 30 }),
+        { cor: 'var(--neutro-forte)', valor: x.G ?? 0, txt: `sem grupo · ${x.G_pessoas ?? 0} ${x.G_pessoas === 1 ? 'pessoa' : 'pessoas'}` }]),
+    })), { series: SERIES3, h: 240, vazio: 'O gráfico aparece quando o estudo começar.' }),
+    recrutamento: (w) => svgLinhas(w, rec.map((x) => dd(x.dia)), SERIES3.map((s) => ({ ...s, valores: rec.map((x) => x[s.id]) })),
+      { tips: rec.map((x) => dicaHtml(`${dataPt(x.dia)} · total ${x.A + x.B + x.G}`, SERIES3.map((s) => ({ cor: s.cor, valor: x[s.id], txt: s.nome })))) }),
+    semanas: (w) => svgLinhas(w, sem.map((x) => x.rot), SERIES3.map((se) => ({ ...se, valores: sem.map((x) => x[se.id]) })), {
+      inteiro: false, minEsp: 30,
+      tips: sem.map((x) => dicaHtml(`${x.rot}: ${dataPt(x.ini)}–${dataPt(x.fim)}`, SERIES3.map((s) =>
+        ({ cor: s.cor, valor: f1(x[s.id], 2), txt: `${s.nome} · n = ${x['n' + s.id]}` })))) }),
+    horas: (w) => (d.leituras ? svgColunas(w, porHora(validas).map((x) => ({ ...x, tip: dicaGrupos(`${x.rot}h`, x.v) })),
+      { series: SERIES3, vazio: 'Ainda sem subidas.', minEsp: 30 }) : semLeituras()),
+    semana: (w) => (d.leituras ? svgColunas(w, porDiaSemana(validas).map((x) => ({ ...x, tip: dicaGrupos(x.rot, x.v) })),
+      { series: SERIES3, vazio: 'Ainda sem subidas.', minEsp: 30 }) : semLeituras()),
+    distribuicao: (w) => svgColunas(w, distribuicao(grupos).map((x) => ({
+      ...x, tip: dicaGrupos(`${x.rot} ${x.rot === '1' ? 'subida' : 'subidas'}`, x.v, ['pessoa', 'pessoas']) })),
+    { series: SERIES3, vazio: 'Ainda sem participantes.', minEsp: 30 }),
   });
 
   // Botões e filtros
@@ -550,7 +554,6 @@ function ligarManuais() {
 // ---------------------------------------------------------------------
 // Peças do painel
 // ---------------------------------------------------------------------
-const TOTAL = { id: 'T', nome: 'Total', cor: 'var(--neutro-forte)' };
 const chave = (v) => `<i class="chave-cor" style="background:var(--serie-${v.toLowerCase()})"></i>`;
 
 function kpi(rotulo, valor, nota, fracao) {
@@ -580,36 +583,39 @@ function dicaHtml(titulo, linhas) {
   return `<div class="dica-titulo">${esc(titulo)}</div>${linhas.map((l) =>
     `<div><i style="background:${l.cor}"></i><b>${esc(l.valor)}</b> ${esc(l.txt)}</div>`).join('')}`;
 }
-const dicaAB = (titulo, v, un = ['subida', 'subidas']) => dicaHtml(titulo, SERIES.map((s) =>
-  ({ cor: s.cor, valor: v[s.id], txt: `${v[s.id] === 1 ? un[0] : un[1]} · ${s.id}` })));
+const dicaGrupos = (titulo, v, un = ['subida', 'subidas']) => dicaHtml(titulo, SERIES3.map((s) =>
+  ({ cor: s.cor, valor: v[s.id], txt: `${v[s.id] === 1 ? un[0] : un[1]} · ${s.nome}` })));
 const semLeituras = () => '<p class="muted vazio">Não foi possível carregar as leituras. Carrega em Atualizar.</p>';
 
-/** Participantes acumulados (por dia da 1.ª leitura). */
-function recrutamento(diario, A, B) {
+/** Pessoas acumuladas por grupo (por dia da 1.ª leitura). grupos = resultados de grupo() (A, B, G). */
+function recrutamento(diario, grupos) {
   return diario.map((x) => ({
     dia: x.dia,
-    A: A.part.filter((l) => l.primeiro_dia <= x.dia).length,
-    B: B.part.filter((l) => l.primeiro_dia <= x.dia).length,
+    ...Object.fromEntries(grupos.map((g) => [g.v, g.part.filter((l) => l.primeiro_dia <= x.dia).length])),
   }));
 }
 
 /** Subidas por pessoa em cada semana do estudo (só quem já tinha começado), até à semana atual. */
-function semanas(e, A, B) {
+function semanas(e, grupos) {
   const out = [];
   for (let k = 1; k <= dados.estudo.semanas; k++) {
     const ini = somar(e.inicio, (k - 1) * 7);
     if (ini > e.hoje && k > 1) break;
     const fim = minStr(somar(ini, 6), e.fim);
-    const ativos = (Gr) => Gr.part.filter((l) => l.primeiro_dia <= fim).map((l) => l.por_semana[k - 1] ?? 0);
-    const a = ativos(A), b = ativos(B);
-    out.push({ rot: `S${k}`, ini, fim, A: a.length ? media(a) : null, B: b.length ? media(b) : null, nA: a.length, nB: b.length });
+    const linha = { rot: `S${k}`, ini, fim };
+    grupos.forEach((g) => {
+      const a = g.part.filter((l) => l.primeiro_dia <= fim).map((l) => l.por_semana[k - 1] ?? 0);
+      linha[g.v] = a.length ? media(a) : null;
+      linha[`n${g.v}`] = a.length;
+    });
+    out.push(linha);
   }
   return out;
 }
 
-function contarAB(lista, chaveDe, chaves) {
-  const v = new Map(chaves.map((k) => [k, { A: 0, B: 0 }]));
-  lista.forEach((x) => { const k = chaveDe(x); if (v.has(k)) v.get(k)[x.variante]++; });
+function contarGrupos(lista, chaveDe, chaves) {
+  const v = new Map(chaves.map((k) => [k, { A: 0, B: 0, G: 0 }]));
+  lista.forEach((x) => { const k = chaveDe(x); if (v.has(k) && x.variante in v.get(k)) v.get(k)[x.variante]++; });
   return v;
 }
 
@@ -617,20 +623,50 @@ function porHora(validas) {
   const horas = validas.map((x) => Number(x.hora.slice(0, 2)));
   const ini = Math.min(7, ...horas), fim = Math.max(20, ...horas);
   const ks = Array.from({ length: fim - ini + 1 }, (_, i) => ini + i);
-  const v = contarAB(validas, (x) => Number(x.hora.slice(0, 2)), ks);
+  const v = contarGrupos(validas, (x) => Number(x.hora.slice(0, 2)), ks);
   return ks.map((h) => ({ rot: String(h), v: v.get(h) }));
 }
 
 function porDiaSemana(validas) {
-  const v = contarAB(validas, (x) => (new Date(`${x.data}T12:00:00Z`).getUTCDay() + 6) % 7, [0, 1, 2, 3, 4, 5, 6]);
+  const v = contarGrupos(validas, (x) => (new Date(`${x.data}T12:00:00Z`).getUTCDay() + 6) % 7, [0, 1, 2, 3, 4, 5, 6]);
   return DIAS_SEMANA.map((rot, i) => ({ rot, v: v.get(i) }));
 }
 
-function distribuicao(A, B) {
+function distribuicao(grupos) {
   const classes = [['1', 1, 1], ['2', 2, 2], ['3–4', 3, 4], ['5–9', 5, 9], ['10–19', 10, 19], ['20+', 20, Infinity]];
   return classes.map(([rot, a, b]) => ({
-    rot, v: { A: A.part.filter((l) => l.subidas >= a && l.subidas <= b).length, B: B.part.filter((l) => l.subidas >= a && l.subidas <= b).length },
+    rot, v: Object.fromEntries(grupos.map((g) => [g.v, g.part.filter((l) => l.subidas >= a && l.subidas <= b).length])),
   }));
+}
+
+/** Uma linha por cada ID que leu pelo menos um QR no período (toda a gente, mesmo sem subida válida). */
+function cartaoPessoas(d, semEx) {
+  const nome = { A: 'A · coletivo', B: 'B · pessoal', G: 'Sem grupo' };
+  const cor = { A: 'var(--serie-a)', B: 'var(--serie-b)', G: 'var(--neutro-forte)' };
+  const alturas = Object.values(CONFIG.alturaLanco);
+  const mPorAndar = alturas.length ? media(alturas) : 3;
+  const analise = (l) => (l.variante === 'G' ? 'não · sem grupo'
+    : l.subidas < 1 ? 'não · sem subida válida'
+    : semEx && l.ex_convidado ? 'não · excluído pelo filtro' : 'sim');
+  const comSubida = d.participantes.filter((l) => l.subidas >= 1).length;
+  const linhas = d.participantes.map((l) => `<tr class="${l.subidas >= 1 ? '' : 'apagado'}">
+      <td><strong>${esc(l.id)}</strong></td>
+      <td><i class="chave-cor" style="background:${cor[l.variante] ?? 'var(--neutro)'}"></i>${nome[l.variante] ?? esc(l.variante)}</td>
+      <td>${l.tem_conta ? 'sim' : 'não'}</td><td>${dataPt(l.primeiro_dia)}</td>
+      <td class="n">${l.n_scans}</td><td class="n">${l.subidas}${l.manuais ? ` <span class="nota">(${l.manuais} à mão)</span>` : ''}</td>
+      <td class="n">${l.andares}</td><td class="n">${ui.fmt(l.andares * mPorAndar, 1)}</td>
+      <td class="n">${l.dias}</td><td class="n">${l.meta_semanal ? `${l.meta_semanal}×` : '—'}</td><td>${analise(l)}</td></tr>`).join('');
+  return `<section class="cartao s12">
+    <div class="titulo-linha"><h2>Todas as pessoas</h2>
+      <span class="nota">${d.participantes.length} leram pelo menos um QR · ${comSubida} com subida válida</span></div>
+    <div class="tabela-scroll tabela-alta"><table>
+      <thead><tr><th>Pessoa</th><th>Grupo</th><th>Conta</th><th>1.ª leitura</th><th class="n">Leituras</th><th class="n">Subidas</th>
+        <th class="n">Andares</th><th class="n">Metros</th><th class="n">Dias</th><th class="n">Meta</th><th>Na análise A/B</th></tr></thead>
+      <tbody>${linhas || '<tr><td colspan="11" class="muted">Ainda ninguém leu um QR.</td></tr>'}</tbody>
+    </table></div>
+    <p class="nota" style="margin:8px 0 0">Leituras = todos os QR lidos (inícios, continuações, rejeitadas…). Subidas = subidas válidas.
+      Quem só leu o QR de partida aparece a cinzento.</p>
+  </section>`;
 }
 
 function percursos(validas, temLeituras) {
