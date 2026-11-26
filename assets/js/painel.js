@@ -10,8 +10,6 @@ const CHAVE_TESTES = 'sobe_painel_testes';
 const comTestes = () => { try { return sessionStorage.getItem(CHAVE_TESTES) === '1'; } catch { return false; } };
 const CHAVE_EX = 'sobe_painel_sem_ex';
 const excluirEx = () => { try { return sessionStorage.getItem(CHAVE_EX) === '1'; } catch { return false; } };
-const CHAVE_MAN = 'sobe_painel_sem_manuais';
-const semManuais = () => { try { return sessionStorage.getItem(CHAVE_MAN) === '1'; } catch { return false; } };
 
 // Uma só caixa de dica para todos os gráficos.
 const dica = Object.assign(document.createElement('div'), { className: 'dica', hidden: true, role: 'tooltip' });
@@ -161,7 +159,7 @@ async function entrar(pw) {
   let r, coletivo, leituras = null;
   try {
     [r, coletivo] = await Promise.all([
-      rpc('painel', { p_password: pw, p_incluir_fora: comTestes(), p_incluir_manuais: !semManuais() }),
+      rpc('painel', { p_password: pw, p_incluir_fora: comTestes() }),
       rpc('progresso_coletivo').catch((e) => { console.error(e); return null; }),
     ]);
   } catch (e) {
@@ -175,7 +173,7 @@ async function entrar(pw) {
   try { sessionStorage.setItem(CHAVE, pw); } catch { /* */ }
   // Leituras uma a uma (hora do dia, dia da semana, percursos, tempos). Só depois do login certo.
   try {
-    const l = await rpc('painel_leituras', { p_password: pw, p_incluir_fora: comTestes(), p_incluir_manuais: !semManuais() });
+    const l = await rpc('painel_leituras', { p_password: pw, p_incluir_fora: comTestes() });
     if (l.ok) leituras = l.leituras;
   } catch (e) { console.error(e); }
   mostrarPainel({ ...r, coletivo, leituras });
@@ -255,8 +253,6 @@ function mostrarPainel(d) {
         Incluir leituras de teste <span class="nota">(${d.scans_fora_estudo})</span></label>
       <label class="filtro"><input type="checkbox" id="sem-ex" ${semEx ? 'checked' : ''}>
         Excluir quem usou sem grupo antes de 20/11 <span class="nota">(A ${nEx.A} · B ${nEx.B})</span></label>
-      <label class="filtro"><input type="checkbox" id="sem-manuais" ${d.inclui_manuais === false ? 'checked' : ''}>
-        Excluir subidas registadas à mão <span class="nota">(${(d.manuais || []).length})</span></label>
     </div>
     ${d.inclui_fora ? '<p class="aviso-caixa largo-total" style="margin:0"><strong>A mostrar leituras de teste.</strong> Não usar estes números na análise.</p>' : ''}
 
@@ -385,8 +381,6 @@ function mostrarPainel(d) {
           <li>Ler o QR em cada piso seguido é uma só subida (com mais andares), não várias.</li>
           <li>Regras: ${d.regras.min_seg_por_andar}–${d.regras.max_seg_por_andar} s por andar,
             ${Math.round(d.regras.cooldown_seg / 60)} min entre subidas. Contas criadas: ${d.contas ?? 0}.</li>
-          <li>Subidas registadas à mão: subidas reais em que a pessoa se esqueceu do QR. Contam como válidas
-            (sem tempo de subida); o filtro no topo permite fazer a análise sem elas. Nos CSV: colunas manual e subidas_manuais.</li>
           <li>Confirmar os testes no R/SPSS com o CSV de participantes.</li>
         </ul>
       </details>
@@ -439,9 +433,9 @@ function mostrarPainel(d) {
         lista = r.leituras;
       }
       descarregar(`sobe-leituras${suf}.csv`, csv([
-        ['participante', 'variante', 'data', 'hora', 'piso_origem', 'piso', 'resultado', 'segundos', 'andares', 'no_estudo', 'manual'],
+        ['participante', 'variante', 'data', 'hora', 'piso_origem', 'piso', 'resultado', 'segundos', 'andares', 'no_estudo'],
         ...lista.map((x) => [x.participante, x.variante, x.data, x.hora, x.piso_origem, x.piso, x.resultado,
-          x.segundos, x.andares, x.no_estudo ? 'sim' : 'nao', x.manual ? 'sim' : 'nao'])]));
+          x.segundos, x.andares, x.no_estudo ? 'sim' : 'nao'])]));
     } catch (err) {
       console.error(err); alert('Não foi possível exportar. Tenta outra vez.');
     } finally { b.disabled = false; b.textContent = 'Leituras'; }
@@ -454,10 +448,6 @@ function mostrarPainel(d) {
     try { sessionStorage.setItem(CHAVE_TESTES, ev.target.checked ? '1' : '0'); } catch { /* */ }
     entrar(sessionStorage.getItem(CHAVE) || '');
   };
-  document.getElementById('sem-manuais').onchange = (ev) => {
-    try { sessionStorage.setItem(CHAVE_MAN, ev.target.checked ? '1' : '0'); } catch { /* */ }
-    entrar(sessionStorage.getItem(CHAVE) || '');
-  };
   ligarManuais();
   ligarDicas(ecra.querySelector('.dash'));
 }
@@ -468,7 +458,7 @@ function mostrarPainel(d) {
 let avisoManual = null;      // { ok, txt } mostrado depois de recarregar o painel
 let ultimaAlcunha = '';      // para registar várias subidas da mesma pessoa seguidas
 const ERROS_MANUAL = {
-  sem_alcunha: 'Não há nenhuma conta com essa alcunha. (Quem usa sem conta não pode ser registado à mão.)',
+  sem_alcunha: 'Não há nenhuma conta com essa alcunha. (Quem usa sem conta não pode ser registado aqui.)',
   pisos: 'O piso de chegada tem de ser acima do de partida. Descer não conta.',
   quando: 'A data e a hora têm de ser dos últimos 14 dias e não podem ser no futuro.',
   duplicada: 'Essa pessoa já tem uma subida registada perto dessa hora (10 min).',
@@ -483,8 +473,7 @@ function cartaoManuais(d) {
   const minDia = [e.inicio, somar(e.hoje, -13)].sort().at(-1);
   return `<section class="cartao s12" id="manuais">
     <h2>Registar subida esquecida</h2>
-    <p class="sub">Para subidas reais em que a pessoa se esqueceu de ler o QR. Ficam marcadas como “à mão”
-      e o filtro no topo permite fazer a análise sem elas.</p>
+    <p class="sub">Para subidas em que a pessoa se esqueceu de ler o QR. Contam como qualquer outra subida.</p>
     <form id="form-manual" class="form-manual" novalidate>
       <label>Alcunha<input type="text" id="m-u" autocomplete="off" autocapitalize="none" spellcheck="false" required value="${esc(ultimaAlcunha)}"></label>
       <label>Dia<input type="date" id="m-dia" required value="${e.hoje}" min="${minDia}" max="${e.hoje}"></label>
@@ -538,7 +527,7 @@ function ligarManuais() {
     document.getElementById('manuais')?.scrollIntoView({ block: 'nearest' });
   });
   document.querySelectorAll('[data-apagar]').forEach((b) => b.addEventListener('click', async () => {
-    if (!confirm('Apagar esta subida registada à mão?')) return;
+    if (!confirm('Apagar esta subida?')) return;
     b.disabled = true;
     try {
       const r = await rpc('painel_apagar_subida', { p_password: pw(), p_id: Number(b.dataset.apagar) });
@@ -653,7 +642,7 @@ function cartaoPessoas(d, semEx) {
       <td><strong>${esc(l.id)}</strong></td>
       <td><i class="chave-cor" style="background:${cor[l.variante] ?? 'var(--neutro)'}"></i>${nome[l.variante] ?? esc(l.variante)}</td>
       <td>${l.tem_conta ? 'sim' : 'não'}</td><td>${dataPt(l.primeiro_dia)}</td>
-      <td class="n">${l.n_scans}</td><td class="n">${l.subidas}${l.manuais ? ` <span class="nota">(${l.manuais} à mão)</span>` : ''}</td>
+      <td class="n">${l.n_scans}</td><td class="n">${l.subidas}</td>
       <td class="n">${l.andares}</td><td class="n">${ui.fmt(l.andares * mPorAndar, 1)}</td>
       <td class="n">${l.dias}</td><td class="n">${l.meta_semanal ? `${l.meta_semanal}×` : '—'}</td><td>${analise(l)}</td></tr>`).join('');
   return `<section class="cartao s12">
@@ -920,10 +909,10 @@ function csv(linhas) {
 }
 function csvParticipantes(d) {
   const n = d.estudo.semanas;
-  const cab = ['participante', 'variante', 'tem_conta', 'ex_convidado', 'primeiro_dia', 'leituras', 'subidas_validas', 'subidas_manuais', 'andares',
+  const cab = ['participante', 'variante', 'tem_conta', 'ex_convidado', 'primeiro_dia', 'leituras', 'subidas_validas', 'andares',
     'dias_diferentes', 'subidas_7d', 'repetidas_7d', 'janela_7d_completa', 'semanas_expostas', 'subidas_por_semana', 'meta_semanal',
     ...Array.from({ length: n }, (_, k) => `semana_${k + 1}`)];
-  const rows = d.participantes.map((l) => [l.id, l.variante, l.tem_conta ? 'sim' : 'nao', l.ex_convidado ? 'sim' : 'nao', l.primeiro_dia, l.n_scans, l.subidas, l.manuais ?? 0, l.andares,
+  const rows = d.participantes.map((l) => [l.id, l.variante, l.tem_conta ? 'sim' : 'nao', l.ex_convidado ? 'sim' : 'nao', l.primeiro_dia, l.n_scans, l.subidas, l.andares,
     l.dias, l.subidas_7d, Math.max(0, l.subidas_7d - 1), janelaCompleta(l, d.estudo) ? 'sim' : 'nao', l.semanas_expostas,
     (l.subidas / Math.max(1, l.semanas_expostas)).toFixed(3), l.meta_semanal ?? '', ...l.por_semana]);
   return csv([cab, ...rows]);
