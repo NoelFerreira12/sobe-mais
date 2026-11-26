@@ -466,10 +466,25 @@ const ERROS_MANUAL = {
   password: 'A sessão do painel expirou. Sai e entra outra vez.',
 };
 
+// Só as subidas registadas neste navegador nos últimos 5 minutos aparecem (para desfazer um engano).
+const CHAVE_REG = 'sobe_painel_registadas';
+const JANELA_DESFAZER = 5 * 60 * 1000;
+function registadasRecentes() {
+  try {
+    const o = JSON.parse(sessionStorage.getItem(CHAVE_REG) || '{}');
+    return Object.fromEntries(Object.entries(o).filter(([, t]) => Date.now() - t < JANELA_DESFAZER));
+  } catch { return {}; }
+}
+function guardarRegistada(id) {
+  const o = { ...registadasRecentes(), [id]: Date.now() };
+  try { sessionStorage.setItem(CHAVE_REG, JSON.stringify(o)); } catch { /* */ }
+}
+
 function cartaoManuais(d) {
   const e = d.estudo;
   const pisos = CONFIG.pisos.map((p) => `<option value="${p}">Piso ${p}</option>`).join('');
-  const lista = d.manuais || [];
+  const rec = registadasRecentes();
+  const lista = (d.manuais || []).filter((m) => rec[m.id]);
   const minDia = [e.inicio, somar(e.hoje, -13)].sort().at(-1);
   return `<section class="cartao s12" id="manuais">
     <h2>Registar subida esquecida</h2>
@@ -483,13 +498,13 @@ function cartaoManuais(d) {
       <button class="btn pequeno" type="submit">Registar</button>
     </form>
     ${avisoManual ? `<p class="${avisoManual.ok ? 'ok-caixa' : 'aviso-caixa'}" role="status" style="margin:12px 0 0">${esc(avisoManual.txt)}</p>` : ''}
-    <div class="tabela-scroll" style="margin-top:12px"><table>
+    ${lista.length ? `<div class="tabela-scroll" id="recentes" style="margin-top:12px"><table>
       <thead><tr><th>Pessoa</th><th>Grupo</th><th>Dia</th><th>Hora</th><th>Subida</th><th></th></tr></thead>
-      <tbody>${lista.map((m) => `<tr><td>${esc(m.participante ?? '—')}</td><td>${esc(m.variante)}</td><td>${dataPt(m.dia)}</td>
+      <tbody>${lista.map((m) => `<tr data-expira="${rec[m.id] + JANELA_DESFAZER}"><td>${esc(m.participante ?? '—')}</td><td>${esc(m.variante)}</td><td>${dataPt(m.dia)}</td>
         <td>${esc(m.hora)}</td><td>Piso ${m.piso_origem} → ${m.piso}${m.no_estudo ? '' : ' <span class="nota">(fora do estudo)</span>'}</td>
-        <td class="n"><button class="ligacao-btn" type="button" data-apagar="${Number(m.id)}" style="min-height:0;padding:0">Apagar</button></td></tr>`).join('')
-        || '<tr><td colspan="6" class="muted">Ainda nenhuma.</td></tr>'}</tbody>
+        <td class="n"><button class="ligacao-btn" type="button" data-apagar="${Number(m.id)}" style="min-height:0;padding:0">Apagar</button></td></tr>`).join('')}</tbody>
     </table></div>
+    <p class="nota" style="margin:6px 0 0">Enganaste-te? Podes apagar durante 5 minutos.</p>` : ''}
   </section>`;
 }
 
@@ -501,6 +516,12 @@ function ligarManuais() {
   document.getElementById('m-ate').value = '1';
   avisoManual = null;
   const pw = () => sessionStorage.getItem(CHAVE) || '';
+  // Cada linha some ao fim dos 5 minutos; sem linhas, some a tabela e a nota.
+  document.querySelectorAll('#recentes tr[data-expira]').forEach((tr) => setTimeout(() => {
+    const caixa = tr.closest('#recentes');
+    tr.remove();
+    if (caixa && !caixa.querySelector('tr[data-expira]')) { caixa.nextElementSibling?.remove(); caixa.remove(); }
+  }, Math.max(0, Number(tr.dataset.expira) - Date.now())));
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const val = (id) => document.getElementById(id).value;
@@ -520,6 +541,7 @@ function ligarManuais() {
       r = { ok: false, erro: 'rede' };
     }
     ultimaAlcunha = u;
+    if (r.ok) guardarRegistada(r.id);
     avisoManual = r.ok
       ? { ok: true, txt: `Registada: ${val('m-dia').split('-').reverse().join('/')} às ${val('m-hora')}, piso ${val('m-de')} → ${val('m-ate')} (${r.andares} ${r.andares === 1 ? 'andar' : 'andares'}, grupo ${r.variante}).` }
       : { ok: false, txt: ERROS_MANUAL[r.erro] ?? 'Não foi possível registar. Tenta outra vez.' };
