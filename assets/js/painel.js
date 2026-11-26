@@ -458,7 +458,7 @@ function mostrarPainel(d) {
 let avisoManual = null;      // { ok, txt } mostrado depois de recarregar o painel
 let ultimaAlcunha = '';      // para registar várias subidas da mesma pessoa seguidas
 const ERROS_MANUAL = {
-  sem_alcunha: 'Não há nenhuma conta com essa alcunha. (Quem usa sem conta não pode ser registado aqui.)',
+  sem_alcunha: 'Não encontrei essa alcunha nem esse ID. Para quem não tem conta (sem grupo), usa o ID da tabela "Todas as pessoas" (ex.: P012).',
   pisos: 'O piso de chegada tem de ser acima do de partida. Descer não conta.',
   quando: 'A data e a hora têm de ser dos últimos 14 dias e não podem ser no futuro.',
   duplicada: 'Essa pessoa já tem uma subida registada perto dessa hora (10 min).',
@@ -488,9 +488,9 @@ function cartaoManuais(d) {
   const minDia = [e.inicio, somar(e.hoje, -13)].sort().at(-1);
   return `<section class="cartao s12" id="manuais">
     <h2>Registar subida esquecida</h2>
-    <p class="sub">Para subidas em que a pessoa se esqueceu de ler o QR. Contam como qualquer outra subida.</p>
+    <p class="sub">Para subidas em que a pessoa se esqueceu de ler o QR. Contam como qualquer outra subida. Quem não tem conta (sem grupo): escreve o ID da tabela "Todas as pessoas" (ex.: P012).</p>
     <form id="form-manual" class="form-manual" novalidate>
-      <label>Alcunha<input type="text" id="m-u" autocomplete="off" autocapitalize="none" spellcheck="false" required value="${esc(ultimaAlcunha)}"></label>
+      <label>Alcunha ou ID<input type="text" id="m-u" autocomplete="off" autocapitalize="none" spellcheck="false" required value="${esc(ultimaAlcunha)}"></label>
       <label>Dia<input type="date" id="m-dia" required value="${e.hoje}" min="${minDia}" max="${e.hoje}"></label>
       <label>Hora<input type="time" id="m-hora" required></label>
       <label>De<select id="m-de">${pisos}</select></label>
@@ -527,7 +527,7 @@ function ligarManuais() {
     const val = (id) => document.getElementById(id).value;
     const u = val('m-u').trim().toLowerCase();
     if (!u || !val('m-dia') || !val('m-hora')) {
-      avisoManual = { ok: false, txt: 'Preenche a alcunha, o dia e a hora.' };
+      avisoManual = { ok: false, txt: 'Preenche a alcunha (ou o ID), o dia e a hora.' };
       return mostrarPainel(dados);
     }
     const btn = form.querySelector('button[type=submit]');
@@ -535,7 +535,8 @@ function ligarManuais() {
     let r;
     try {
       r = await rpc('painel_registar_subida', { p_password: pw(), p_utilizador: u, p_dia: val('m-dia'),
-        p_hora: val('m-hora'), p_origem: Number(val('m-de')), p_destino: Number(val('m-ate')) });
+        p_hora: val('m-hora'), p_origem: Number(val('m-de')), p_destino: Number(val('m-ate')),
+        p_incluir_fora: !!dados?.inclui_fora });
     } catch (err) {
       console.error(err);
       r = { ok: false, erro: 'rede' };
@@ -543,7 +544,7 @@ function ligarManuais() {
     ultimaAlcunha = u;
     if (r.ok) guardarRegistada(r.id);
     avisoManual = r.ok
-      ? { ok: true, txt: `Registada: ${val('m-dia').split('-').reverse().join('/')} às ${val('m-hora')}, piso ${val('m-de')} → ${val('m-ate')} (${r.andares} ${r.andares === 1 ? 'andar' : 'andares'}, grupo ${r.variante}).` }
+      ? { ok: true, txt: `Registada: ${val('m-dia').split('-').reverse().join('/')} às ${val('m-hora')}, piso ${val('m-de')} → ${val('m-ate')} (${r.andares} ${r.andares === 1 ? 'andar' : 'andares'}, ${r.variante === 'G' ? 'sem grupo' : `grupo ${r.variante}`}).` }
       : { ok: false, txt: ERROS_MANUAL[r.erro] ?? 'Não foi possível registar. Tenta outra vez.' };
     if (r.ok) await entrar(pw()); else mostrarPainel(dados);
     document.getElementById('manuais')?.scrollIntoView({ block: 'nearest' });
