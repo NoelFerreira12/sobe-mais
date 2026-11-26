@@ -11,6 +11,7 @@
     "config:sync": "node scripts/admin.mjs config:sync",
     "backup": "node scripts/backup.mjs",
     "limpar-testes": "node scripts/admin.mjs limpar-testes",
+    "criar-contas": "node scripts/criar-contas.mjs",
     "versao": "node scripts/versao.mjs",
     "servir": "npx --yes http-server -p 8080 -c-1 ."
   },

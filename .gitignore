@@ -6,6 +6,8 @@ node_modules/
 qrcodes/
 # Backups locais (contêm IDs e tokens): npm run backup
 backups/
+# Listas de contas com passwords / códigos de recuperação: npm run criar-contas
+contas*.csv
 supabase/.temp/
 supabase/.branches/
 .DS_Store
