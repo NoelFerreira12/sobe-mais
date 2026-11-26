@@ -497,10 +497,19 @@ function cartaoManuais(d) {
       <label>Até<select id="m-ate">${pisos}</select></label>
       <button class="btn pequeno" type="submit">Registar</button>
     </form>
+    <h3 style="margin:16px 0 4px">Pessoa nova sem grupo</h3>
+    <p class="sub">Para quem subiu e não tem conta nem ID. Cria uma pessoa nova "sem grupo" com esta subida.</p>
+    <form id="form-sem-grupo" class="form-manual" novalidate>
+      <label>Dia<input type="date" id="g-dia" required value="${e.hoje}" min="${minDia}" max="${e.hoje}"></label>
+      <label>Hora<input type="time" id="g-hora" required></label>
+      <label>De<select id="g-de">${pisos}</select></label>
+      <label>Até<select id="g-ate">${pisos}</select></label>
+      <button class="btn pequeno" type="submit">Registar</button>
+    </form>
     ${avisoManual ? `<p class="${avisoManual.ok ? 'ok-caixa' : 'aviso-caixa'}" role="status" style="margin:12px 0 0">${esc(avisoManual.txt)}</p>` : ''}
     ${lista.length ? `<div class="tabela-scroll" id="recentes" style="margin-top:12px"><table>
       <thead><tr><th>Pessoa</th><th>Grupo</th><th>Dia</th><th>Hora</th><th>Subida</th><th></th></tr></thead>
-      <tbody>${lista.map((m) => `<tr data-expira="${rec[m.id] + JANELA_DESFAZER}"><td>${esc(m.participante ?? '—')}</td><td>${esc(m.variante)}</td><td>${dataPt(m.dia)}</td>
+      <tbody>${lista.map((m) => `<tr data-expira="${rec[m.id] + JANELA_DESFAZER}"><td>${esc(m.participante ?? '—')}</td><td>${m.variante === 'G' ? 'sem grupo' : esc(m.variante)}</td><td>${dataPt(m.dia)}</td>
         <td>${esc(m.hora)}</td><td>Piso ${m.piso_origem} → ${m.piso}${m.no_estudo ? '' : ' <span class="nota">(fora do estudo)</span>'}</td>
         <td class="n"><button class="ligacao-btn" type="button" data-apagar="${Number(m.id)}" style="min-height:0;padding:0">Apagar</button></td></tr>`).join('')}</tbody>
     </table></div>
@@ -512,8 +521,10 @@ function ligarManuais() {
   const form = document.getElementById('form-manual');
   if (!form) return;
   // De: piso 0; Até: o piso acima (o caso mais comum).
-  document.getElementById('m-de').value = '0';
-  document.getElementById('m-ate').value = '1';
+  for (const p of ['m', 'g']) {
+    document.getElementById(`${p}-de`).value = '0';
+    document.getElementById(`${p}-ate`).value = '1';
+  }
   avisoManual = null;
   const pw = () => sessionStorage.getItem(CHAVE) || '';
   // Cada linha some ao fim dos 5 minutos; sem linhas, some a tabela e a nota.
@@ -545,6 +556,30 @@ function ligarManuais() {
     if (r.ok) guardarRegistada(r.id);
     avisoManual = r.ok
       ? { ok: true, txt: `Registada: ${val('m-dia').split('-').reverse().join('/')} às ${val('m-hora')}, piso ${val('m-de')} → ${val('m-ate')} (${r.andares} ${r.andares === 1 ? 'andar' : 'andares'}, ${r.variante === 'G' ? 'sem grupo' : `grupo ${r.variante}`}).` }
+      : { ok: false, txt: ERROS_MANUAL[r.erro] ?? 'Não foi possível registar. Tenta outra vez.' };
+    if (r.ok) await entrar(pw()); else mostrarPainel(dados);
+    document.getElementById('manuais')?.scrollIntoView({ block: 'nearest' });
+  });
+  const formG = document.getElementById('form-sem-grupo');
+  formG.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const val = (id) => document.getElementById(id).value;
+    if (!val('g-dia') || !val('g-hora')) {
+      avisoManual = { ok: false, txt: 'Preenche o dia e a hora da pessoa nova.' };
+      return mostrarPainel(dados);
+    }
+    formG.querySelector('button[type=submit]').disabled = true;
+    let r;
+    try {
+      r = await rpc('painel_registar_sem_grupo', { p_password: pw(), p_dia: val('g-dia'), p_hora: val('g-hora'),
+        p_origem: Number(val('g-de')), p_destino: Number(val('g-ate')), p_incluir_fora: !!dados?.inclui_fora });
+    } catch (err) {
+      console.error(err);
+      r = { ok: false, erro: 'rede' };
+    }
+    if (r.ok) guardarRegistada(r.id);
+    avisoManual = r.ok
+      ? { ok: true, txt: `Pessoa nova sem grupo${r.participante ? ` (${r.participante})` : ''}: ${val('g-dia').split('-').reverse().join('/')} às ${val('g-hora')}, piso ${val('g-de')} → ${val('g-ate')} (${r.andares} ${r.andares === 1 ? 'andar' : 'andares'}). Para mais subidas desta pessoa, usa este ID em cima.` }
       : { ok: false, txt: ERROS_MANUAL[r.erro] ?? 'Não foi possível registar. Tenta outra vez.' };
     if (r.ok) await entrar(pw()); else mostrarPainel(dados);
     document.getElementById('manuais')?.scrollIntoView({ block: 'nearest' });
