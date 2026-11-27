@@ -1,7 +1,7 @@
-import { CONFIG } from '../../config.js?v=202611251459';
-import { rpc } from './api.js?v=202611251459';
-import * as ui from './ui.js?v=202611251459';
-import { metros, progressoRota } from './calc.js?v=202611251459';
+import { CONFIG } from '../../config.js?v=202611271457';
+import { rpc } from './api.js?v=202611271457';
+import * as ui from './ui.js?v=202611271457';
+import { metros, progressoRota } from './calc.js?v=202611271457';
 
 const ecra = document.getElementById('ecra');
 document.getElementById('topo').innerHTML = ui.cabecalho('../');
@@ -749,10 +749,14 @@ function cartaoQualidade(d, validas) {
   const barras = grupos.map(([g, nome]) => {
     const t = tot(g);
     const partes = classes.map((c) => ({ ...c, v: c.tipos.reduce((s, x) => s + col(g, x), 0) })).filter((p) => p.v > 0);
-    return `<div class="seg-linha"><span class="seg-rot">${nome}<span class="nota">${t} leituras</span></span>
-      <div class="seg" role="img" aria-label="${nome}: ${partes.map((p) => `${p.nome} ${pct(p.v / t)}`).join(', ')}">${partes.map((p) =>
-        `<span data-tip="${esc(dicaHtml(nome, [{ cor: p.cor, valor: `${pct(p.v / t)} (${p.v})`, txt: p.nome }]))}"
-          style="flex:${p.v} 1 0;background:${p.cor};color:${p.tinta}">${p.v / t >= 0.14 ? pct(p.v / t) : ''}</span>`).join('') || '<span class="seg-vazio"></span>'}</div></div>`;
+    const ocultas = partes.filter((p) => p.v / t < 0.05);
+    const resumo = ocultas.length ? ` · ${ocultas.map((p) => `${p.nome.toLowerCase()} ${pct(p.v / t)}`).join(', ')}` : '';
+    return `<div class="seg-linha"><span class="seg-rot">${nome}<span class="nota">${t} leituras${resumo}</span></span>
+      <div class="seg" role="img" aria-label="${nome}: ${partes.map((p) => `${p.nome} ${pct(p.v / t)}`).join(', ')}">${partes.map((p) => {
+        const f = p.v / t;
+        return `<span class="${f < 0.14 ? 'estreito' : ''}" data-tip="${esc(dicaHtml(nome, [{ cor: p.cor, valor: `${pct(f)} (${p.v})`, txt: p.nome }]))}"
+          style="flex:${p.v} 1 0;background:${p.cor};color:${p.tinta}">${f >= 0.05 ? pct(f) : ''}</span>`;
+      }).join('') || '<span class="seg-vazio"></span>'}</div></div>`;
   }).join('');
   const segAndar = (g) => mediana(validas.filter((x) => x.variante === g && x.andares > 0 && x.segundos != null).map((x) => x.segundos / x.andares));
   const cA = q.contas_por_grupo?.A ?? 0, cB = q.contas_por_grupo?.B ?? 0;

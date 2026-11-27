@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/app.css?v=202611251459">
+  <link rel="stylesheet" href="../assets/css/app.css?v=202611271457">
   <style>
     /* Cores só do painel: neutro (total, percursos, inícios) e estados da qualidade dos dados. */
     /* Validadas (daltonismo e visão normal) na ordem em que se tocam: Subida | Início | Rejeitada. */
@@ -122,7 +122,8 @@
     .seg-rot { font-weight: 700; font-size: .9rem; display: flex; flex-direction: column; line-height: 1.25; }
     .seg-rot .nota { font-weight: 500; }
     .seg { display: flex; gap: 2px; height: 28px; }
-    .seg > span { border-radius: 4px; display: flex; align-items: center; padding: 0 8px; font-size: .8rem; font-weight: 700; min-width: 0; white-space: nowrap; }
+    .seg > span { border-radius: 4px; display: flex; align-items: center; padding: 0 8px; font-size: .8rem; font-weight: 700; min-width: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .seg > span.estreito { padding: 0 2px; justify-content: center; font-size: .75rem; }
     .seg > span.ativo { filter: brightness(1.08); }
     .seg-vazio { flex: 1; background: var(--superficie-2); }
 
@@ -155,6 +156,7 @@
       .kpi .valor { font-size: 1.7rem; }
       .seg-linha { grid-template-columns: 1fr; gap: 6px; }
       .seg-rot { flex-direction: row; gap: 8px; align-items: baseline; }
+      .seg > span.estreito { font-size: .7rem; }
     }
   </style>
 </head>
@@ -163,6 +165,6 @@
     <div id="topo"></div>
     <main id="ecra" class="pilha"></main>
   </div>
-  <script type="module" src="../assets/js/painel.js?v=202611261300"></script>
+  <script type="module" src="../assets/js/painel.js?v=202611271457"></script>
 </body>
 </html>

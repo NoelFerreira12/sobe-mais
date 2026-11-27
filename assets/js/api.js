@@ -1,4 +1,4 @@
-import { CONFIG } from '../../config.js?v=202611251459';
+import { CONFIG } from '../../config.js?v=202611271457';
 
 /** Chama uma função RPC do Supabase. Toda a validação acontece no servidor. */
 export async function rpc(nome, params = {}, { timeoutMs = 15000 } = {}) {
